@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "Cloak: AI Privacy Layer",
   "version": "1.0",
+  "minimum_chrome_version": "111",
   "description": "Masks personal identifying information locally before prompts hit AI servers.",
   "permissions": [
     "storage",
@@ -9,7 +10,9 @@
   ],
   "host_permissions": [
     "*://chatgpt.com/*",
+    "*://*.chatgpt.com/*",
     "*://gemini.google.com/*",
+    "*://claude.ai/*",
     "*://*.claude.ai/*"
   ],
   "action": {
@@ -20,26 +23,26 @@
     {
       "matches": [
         "*://chatgpt.com/*",
+        "*://*.chatgpt.com/*",
         "*://gemini.google.com/*",
+        "*://claude.ai/*",
         "*://*.claude.ai/*"
       ],
       "js": ["content.js"],
-      "run_at": "document_idle"
-    }
-  ],
-  "web_accessible_resources": [
+      "css": ["content.css"],
+      "run_at": "document_start"
+    },
     {
-      "resources": ["intercept.js"],
       "matches": [
         "*://chatgpt.com/*",
+        "*://*.chatgpt.com/*",
         "*://gemini.google.com/*",
+        "*://claude.ai/*",
         "*://*.claude.ai/*"
-      ]
+      ],
+      "js": ["intercept.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
     }
-  ],
-  "icons": {
-    "16": "16.png",
-    "48": "48.png",
-    "128": "128.png"
-  }
+  ]
 }
