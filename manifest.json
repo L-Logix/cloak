@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Cloak: AI Privacy Layer",
+  "version": "1.0",
+  "description": "Masks personal identifying information locally before prompts hit AI servers.",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "*://chatgpt.com/*",
+    "*://gemini.google.com/*",
+    "*://*.claude.ai/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Cloak"
+  },
+"content_scripts": [
+    {
+      "matches": [
+        "*://chatgpt.com/*",
+        "*://gemini.google.com/*",
+        "*://*.claude.ai/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+],
+  "web_accessible_resources": [
+    {
+    "resources": ["intercept.js"],
+    "matches": [
+      "*://chatgpt.com/*",
+       "*://gemini.google.com/*",
+       "*://*.claude.ai/*"
+    ]
+    }
+  ],
+  "icons": {
+    "16": "16.png",
+    "48": "48.png",
+    "128": "128.png"
+  }
+}
+  
