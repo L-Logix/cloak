@@ -4,7 +4,8 @@
   const DEFAULT_SETTINGS = { names: true, emails: true, phones: true };
   const EMAIL_PATTERN = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
   const PHONE_PATTERN = /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g;
-  const PERSON_PATTERN = /\b((?:[Mm]y [Nn]ame [Ii]s|[Ii] [Aa]m|[Ii]'[Mm]|[Tt]his [Ii]s)\s+)([A-Z][a-z]+(?:[-'][A-Z]?[a-z]+)?(?:\s+[A-Z][a-z]+(?:[-'][A-Z]?[a-z]+)?)?)/g;
+  const PERSON_PATTERN = /\b((?:my name is|i am|i'm|this is)\s+)([a-z][a-z]+(?:[-'][a-z]+)?(?:\s+[a-z][a-z]+(?:[-'][a-z]+)?)?)/gi;
+  const NAME_STOPWORDS = new Set(['a', 'an', 'and', 'at', 'email', 'for', 'in', 'my', 'number', 'of', 'on', 'or', 'phone', 'the', 'to', 'with']);
   const MEDIA_PATTERN = /\b(?:draw|generate|create|make)\s+(?:me\s+)?(?:an?\s+)?(?:image|picture|photo|illustration|video)\b|\bimage generation\b/i;
 
   function createMasker() {
@@ -30,7 +31,14 @@
       if (!enabled || typeof value !== 'string') return value;
       let text = value;
       if (settings.names) {
-        text = text.replace(PERSON_PATTERN, (_match, prefix, name) => `${prefix}${register('PERSON', name)}`);
+        text = text.replace(PERSON_PATTERN, (match, prefix, name) => {
+          const words = name.split(/\s+/);
+          while (words.length > 1 && NAME_STOPWORDS.has(words.at(-1).toLowerCase())) words.pop();
+          if (NAME_STOPWORDS.has(words[0].toLowerCase())) return match;
+          const matchedName = words.join(' ');
+          const trailingText = name.slice(matchedName.length);
+          return `${prefix}${register('PERSON', matchedName)}${trailingText}`;
+        });
       }
       if (settings.emails) text = text.replace(EMAIL_PATTERN, (email) => register('EMAIL', email));
       if (settings.phones) text = text.replace(PHONE_PATTERN, (phone) => register('PHONE', phone));

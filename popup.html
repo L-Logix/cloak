@@ -3,94 +3,117 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PromptMask</title>
+  <title>Cloak</title>
   <link rel="stylesheet" href="styles.css">
   <script src="popup.js" defer></script>
 </head>
 <body class="popup-body">
   <main class="popup-shell">
     <header class="popup-header">
-      <a class="brand" href="#" aria-label="PromptMask home">
+      <div class="brand" aria-label="Cloak">
         <span class="brand-mark" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false">
             <path d="M12 2.8 19 5.6v5.8c0 4.5-2.8 7.9-7 9.8-4.2-1.9-7-5.3-7-9.8V5.6l7-2.8Z" />
             <path d="m8.8 11.9 2.1 2.1 4.4-4.7" />
           </svg>
         </span>
-        <span class="brand-name">Prompt<span>Mask</span></span>
-      </a>
+        <span class="brand-name">CLOAK</span>
+      </div>
       <span class="local-tag"><span class="local-dot"></span>ON DEVICE</span>
     </header>
 
-    <section class="protection-panel" aria-labelledby="master-label">
-      <div class="protection-copy">
-        <h1 id="master-label">Protection</h1>
-        <p id="protection-detail">Checking this tab...</p>
-      </div>
-      <button class="switch" id="master-toggle" type="button" role="switch" aria-checked="true" aria-labelledby="master-label" aria-describedby="protection-detail">
-        <span class="switch-thumb"></span>
-      </button>
-    </section>
+    <div class="page-stage">
+      <section class="page-view home-view" data-page-view="home" aria-labelledby="home-heading">
+        <div class="home-copy">
+          <p class="eyebrow">YOUR PRIVATE AI LAYER</p>
+          <h1 id="home-heading">Your words.<br><span>Your control.</span></h1>
+          <p class="home-description" id="protection-detail">Checking protection status...</p>
+        </div>
+        <div class="home-status" id="site-status" data-active="false" role="status" aria-live="polite">
+          <span class="status-light" aria-hidden="true"></span>
+          <span class="status-copy">
+            <strong id="status-label">Checking site</strong>
+            <small id="status-caption">One moment</small>
+          </span>
+          <span class="site-mark" aria-hidden="true">AI</span>
+        </div>
+        <button class="power-control" id="master-toggle" type="button" role="switch" aria-checked="true" aria-label="Cloak protection" aria-describedby="protection-detail">
+          <span class="power-ring" aria-hidden="true">
+            <svg viewBox="0 0 32 32" focusable="false">
+              <path d="M16 4v12" />
+              <path d="M9.2 8.2a12 12 0 1 0 13.6 0" />
+            </svg>
+          </span>
+          <span class="power-label" id="power-label">CLOAK ON</span>
+          <span class="power-hint">Tap to pause protection</span>
+        </button>
+        <p class="home-footnote"><span aria-hidden="true">◆</span> Your private details stay on this device</p>
+      </section>
 
-    <div class="site-status" id="site-status" data-active="false" role="status" aria-live="polite">
-      <span class="status-light" aria-hidden="true"></span>
-      <span id="status-label">Checking site</span>
-      <span class="status-divider" aria-hidden="true"></span>
-      <span class="status-caption" id="status-caption">One moment</span>
-    </div>
-
-    <section class="vault-section" aria-labelledby="vault-heading">
-      <div class="section-heading">
-        <div class="heading-group">
-          <h2 id="vault-heading">Active vault</h2>
+      <section class="page-view vault-view" data-page-view="vault" aria-labelledby="vault-heading" hidden>
+        <div class="page-title-row">
+          <div>
+            <p class="eyebrow">LOCAL ONLY</p>
+            <h1 id="vault-heading">Your vault</h1>
+          </div>
           <span class="vault-count" id="vault-count">0</span>
         </div>
-        <button class="clear-button" id="clear-vault" type="button" disabled>
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path d="M4 6h12M8 6V4h4v2m-6 0 .7 10h6.6L14 6M8.5 9v4m3-4v4" />
-          </svg>
-          <span>Clear vault</span>
-        </button>
-      </div>
-      <p class="vault-intro">Masked details stay on this device.</p>
-      <div class="vault-list" id="vault-list" aria-live="polite">
-        <p class="empty-vault">Nothing masked yet. Your tokens will appear here.</p>
-      </div>
-      <p class="vault-message" id="vault-message" aria-live="polite"></p>
-    </section>
+        <p class="page-description">Masked values are kept here so Cloak can restore your replies.</p>
+        <div class="vault-list" id="vault-list" aria-live="polite">
+          <p class="empty-vault">Nothing masked yet. Your tokens will appear here.</p>
+        </div>
+        <div class="vault-actions">
+          <p class="vault-message" id="vault-message" aria-live="polite"></p>
+          <button class="clear-button" id="clear-vault" type="button" disabled>
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+              <path d="M4 6h12M8 6V4h4v2m-6 0 .7 10h6.6L14 6M8.5 9v4m3-4v4" />
+            </svg>
+            <span>Clear vault</span>
+          </button>
+        </div>
+      </section>
 
-    <details class="settings-panel" id="settings-panel">
-      <summary>
-        <span class="settings-summary-icon" aria-hidden="true">
-          <svg viewBox="0 0 20 20" focusable="false">
-            <path d="M8.2 2.8h3.6l.5 2a5.5 5.5 0 0 1 1.1.6l2-.6 1.8 3.1-1.5 1.5a5.9 5.9 0 0 1 0 1.2l1.5 1.5-1.8 3.1-2-.6a5.5 5.5 0 0 1-1.1.6l-.5 2H8.2l-.5-2a5.5 5.5 0 0 1-1.1-.6l-2 .6-1.8-3.1 1.5-1.5a5.9 5.9 0 0 1 0-1.2L2.8 7.9l1.8-3.1 2 .6a5.5 5.5 0 0 1 1.1-.6l.5-2Z" />
-            <circle cx="10" cy="10" r="2.4" />
-          </svg>
-        </span>
-        <span class="settings-summary-text">Masking settings</span>
-        <span class="settings-state">Customize</span>
-        <svg class="chevron" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m4 6 4 4 4-4" /></svg>
-      </summary>
-      <div class="settings-content">
-        <label class="setting-row" for="setting-names">
-          <span><strong>Names</strong><small>People and personal names</small></span>
-          <input id="setting-names" type="checkbox" data-setting="names" checked>
-        </label>
-        <label class="setting-row" for="setting-emails">
-          <span><strong>Email addresses</strong><small>Personal and work email</small></span>
-          <input id="setting-emails" type="checkbox" data-setting="emails" checked>
-        </label>
-        <label class="setting-row" for="setting-phones">
-          <span><strong>Phone numbers</strong><small>Local and international formats</small></span>
-          <input id="setting-phones" type="checkbox" data-setting="phones" checked>
-        </label>
-      </div>
-    </details>
+      <section class="page-view settings-view" data-page-view="settings" aria-labelledby="settings-heading" hidden>
+        <div class="page-title-row">
+          <div>
+            <p class="eyebrow">MAKE IT YOURS</p>
+            <h1 id="settings-heading">Settings</h1>
+          </div>
+          <span class="settings-gear" aria-hidden="true">⚙</span>
+        </div>
+        <p class="page-description">Choose which details Cloak should keep private.</p>
+        <div class="settings-list">
+          <label class="setting-row" for="setting-names">
+            <span><strong>Names</strong><small>Introduced names and people</small></span>
+            <input id="setting-names" type="checkbox" data-setting="names" checked>
+          </label>
+          <label class="setting-row" for="setting-emails">
+            <span><strong>Email addresses</strong><small>Personal and work email</small></span>
+            <input id="setting-emails" type="checkbox" data-setting="emails" checked>
+          </label>
+          <label class="setting-row" for="setting-phones">
+            <span><strong>Phone numbers</strong><small>Common US number formats</small></span>
+            <input id="setting-phones" type="checkbox" data-setting="phones" checked>
+          </label>
+        </div>
+        <p class="settings-note"><span class="local-dot" aria-hidden="true"></span>Detection and restoration happen locally.</p>
+      </section>
+    </div>
 
-    <footer class="popup-footer">
-      <span class="footer-lock" aria-hidden="true">●</span>
-      <span>Private by design. Your vault never leaves this device.</span>
-    </footer>
+    <nav class="bottom-nav" aria-label="Main navigation">
+      <button class="nav-item is-active" type="button" data-page-target="home" aria-current="page">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m3 9 7-6 7 6v8h-5v-5H8v5H3z" /></svg>
+        <span>Home</span>
+      </button>
+      <button class="nav-item" type="button" data-page-target="vault">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="5" width="14" height="12" rx="2" /><path d="M6 5V4a4 4 0 0 1 8 0v1m-4 5v3" /></svg>
+        <span>Vault</span>
+      </button>
+      <button class="nav-item" type="button" data-page-target="settings">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 2.8h4l.6 2a6 6 0 0 1 1.1.6l2-.6 2 3.4-1.5 1.6a6 6 0 0 1 0 1.3l1.5 1.6-2 3.4-2-.6a6 6 0 0 1-1.1.6l-.6 2H8l-.6-2a6 6 0 0 1-1.1-.6l-2 .6-2-3.4 1.5-1.6a6 6 0 0 1 0-1.3L2.3 8.2l2-3.4 2 .6a6 6 0 0 1 1.1-.6z" /><circle cx="10" cy="10.5" r="2.2" /></svg>
+        <span>Settings</span>
+      </button>
+    </nav>
   </main>
 </body>
 </html>

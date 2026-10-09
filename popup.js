@@ -7,6 +7,7 @@ const SUPPORTED_SITES = [
 
 const ui = {
   masterToggle: document.getElementById('master-toggle'),
+  powerLabel: document.getElementById('power-label'),
   protectionDetail: document.getElementById('protection-detail'),
   siteStatus: document.getElementById('site-status'),
   statusLabel: document.getElementById('status-label'),
@@ -15,7 +16,9 @@ const ui = {
   vaultList: document.getElementById('vault-list'),
   clearVault: document.getElementById('clear-vault'),
   vaultMessage: document.getElementById('vault-message'),
-  settings: [...document.querySelectorAll('[data-setting]')]
+  settings: [...document.querySelectorAll('[data-setting]')],
+  pages: [...document.querySelectorAll('[data-page-view]')],
+  navigation: [...document.querySelectorAll('[data-page-target]')]
 };
 
 let state = {
@@ -25,6 +28,18 @@ let state = {
   site: null
 };
 let messageTimeout;
+
+function showPage(pageName) {
+  for (const page of ui.pages) {
+    page.hidden = page.dataset.pageView !== pageName;
+  }
+  for (const button of ui.navigation) {
+    const active = button.dataset.pageTarget === pageName;
+    button.classList.toggle('is-active', active);
+    if (active) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  }
+}
 
 function supportedSite(url) {
   try {
@@ -38,9 +53,11 @@ function supportedSite(url) {
 function render() {
   ui.masterToggle.setAttribute('aria-checked', String(state.enabled));
   ui.masterToggle.dataset.enabled = String(state.enabled);
+  ui.powerLabel.textContent = state.enabled ? 'CLOAK ON' : 'CLOAK OFF';
+  ui.masterToggle.setAttribute('aria-label', state.enabled ? 'Turn Cloak protection off' : 'Turn Cloak protection on');
   ui.protectionDetail.textContent = state.enabled
-    ? 'Mask sensitive details before they leave your device.'
-    : 'Prompts will pass through without masking.';
+    ? 'Sensitive details are masked before they leave this device.'
+    : 'Cloak is paused. Prompts will pass through unmasked.';
 
   const active = Boolean(state.site && state.enabled);
   ui.siteStatus.dataset.active = String(active);
@@ -88,6 +105,10 @@ function render() {
     input.checked = state.settings[input.dataset.setting] !== false;
   }
 }
+
+ui.navigation.forEach((button) => {
+  button.addEventListener('click', () => showPage(button.dataset.pageTarget));
+});
 
 function save(changes) {
   if (!globalThis.chrome?.storage?.local) return;

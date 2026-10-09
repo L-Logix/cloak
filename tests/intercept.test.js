@@ -23,6 +23,18 @@ test('masks names, emails, and phone numbers and restores them', () => {
   ]);
 });
 
+test('masks lowercase name in the reported ChatGPT prompt without consuming following words', () => {
+  const masker = createMasker();
+  const original = '1. my name is bob and my phone number is 919-123-4567';
+  const masked = masker.maskText(original);
+
+  assert.match(masked, /^1\. my name is \[PERSON_1_[a-z0-9-]+\] and my phone number is \[PHONE_2_[a-z0-9-]+\]$/i);
+  assert.deepEqual(masker.takePendingEntries().map(({ original: value }) => value), [
+    'bob', '919-123-4567'
+  ]);
+  assert.equal(masker.restoreText(masked), original);
+});
+
 test('rewrites Gemini f.req form payloads containing nested JSON', () => {
   const masker = createMasker();
   const innerPayload = JSON.stringify([['Contact john@example.com']]);
