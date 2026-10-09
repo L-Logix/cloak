@@ -16,7 +16,7 @@
     "default_popup": "popup.html",
     "default_title": "Cloak"
   },
-"content_scripts": [
+  "content_scripts": [
     {
       "matches": [
         "*://chatgpt.com/*",
@@ -26,15 +26,15 @@
       "js": ["content.js"],
       "run_at": "document_idle"
     }
-],
+  ],
   "web_accessible_resources": [
     {
-    "resources": ["intercept.js"],
-    "matches": [
-      "*://chatgpt.com/*",
-       "*://gemini.google.com/*",
-       "*://*.claude.ai/*"
-    ]
+      "resources": ["intercept.js"],
+      "matches": [
+        "*://chatgpt.com/*",
+        "*://gemini.google.com/*",
+        "*://*.claude.ai/*"
+      ]
     }
   ],
   "icons": {
@@ -43,4 +43,3 @@
     "128": "128.png"
   }
 }
-  
