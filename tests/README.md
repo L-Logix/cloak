@@ -8,7 +8,53 @@ node --test tests/intercept.test.js
 
 These exercise the same masking code used by the extension, including Gemini's nested `f.req` form body and token restoration across response stream chunks.
 
-This test sends a synthetic email address and phone number to the real Gemini API only after replacing them with PromptMask-style tokens. It prints the original prompt, actual request payload, actual Gemini response, and locally restored response. No real personal information is used.
+`watch_gemini.py` attaches to the Gemini tab you use in Chrome. It prints the request body sent to Gemini, the response received from Gemini, and `[PromptMask]` browser-console status messages. It uses Chrome's local DevTools Protocol; no Gemini API key or proxy is involved.
+
+## Start Chrome for local inspection
+
+Chrome must be started with remote debugging enabled before Python can attach. A normal Chrome process that is already running without this flag cannot be inspected retroactively. Close Chrome first, then launch a separate debug profile:
+
+```sh
+google-chrome --remote-debugging-port=9222 --user-data-dir="$HOME/.promptmask-debug"
+```
+
+If your Chrome executable is named `chrome` or `chromium`, use that command instead. In the opened browser, load this project as an unpacked extension from `chrome://extensions`, sign in to Gemini, and open `https://gemini.google.com`.
+
+Start the watcher in a terminal from the project folder:
+
+```sh
+python3 tests/watch_gemini.py
+```
+
+When it reports that it attached, use Gemini normally. Press Ctrl+C in the watcher terminal to stop. Options include `--port 9222`, `--wait 120`, and `--max-chars 50000`.
+
+Install the only Python dependency if needed:
+
+```sh
+python3 -m pip install websocket-client
+```
+
+## What it shows
+
+- `[Browser -> Gemini]` and the decoded request body, including nested Gemini `f.req` prompt text.
+- Gemini's HTTP status and the response body captured from the browser network events.
+- `[PromptMask]` console status messages, including masking state and the locally restored response when tokens were used.
+
+The watcher connects only to `127.0.0.1`; do not expose Chrome's remote-debugging port to a network. Request and response bodies can contain private chat text. The watcher prints them in your terminal and does not write a log file.
+
+## Tests
+
+Run the interception behavior tests with Node.js:
+
+```sh
+node --test tests/intercept.test.js
+```
+
+Run the Python watcher parser tests:
+
+```sh
+python3 -m unittest discover -s tests -p 'test_watch_gemini.py' -v
+```
 
 Set `GEMINI_API_KEY` in the environment, then run:
 

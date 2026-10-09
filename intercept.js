@@ -132,7 +132,7 @@
     return false;
   }
 
-  function restoreStream(stream, masker, TransformStreamClass = TransformStream) {
+  function restoreStream(stream, masker, TransformStreamClass = TransformStream, onRestoredText = () => {}, onComplete = () => {}) {
     const decoder = new TextDecoder();
     const encoder = new TextEncoder();
     const carryLength = Math.max(0, masker.maxTokenLength() - 1);
@@ -151,13 +151,18 @@
           }
         }
         if (safeLength) {
-          controller.enqueue(encoder.encode(masker.restoreText(carry.slice(0, safeLength))));
+          const restored = masker.restoreText(carry.slice(0, safeLength));
+          onRestoredText(restored);
+          controller.enqueue(encoder.encode(restored));
           carry = carry.slice(safeLength);
         }
       },
       flush(controller) {
         carry += decoder.decode();
-        controller.enqueue(encoder.encode(masker.restoreText(carry)));
+        const restored = masker.restoreText(carry);
+        onRestoredText(restored);
+        controller.enqueue(encoder.encode(restored));
+        onComplete();
       }
     }));
   }
@@ -165,11 +170,19 @@
   function install() {
     const nativeFetch = root.fetch;
     const masker = createMasker();
+    let enabled = true;
 
     root.addEventListener('message', (event) => {
       if (event.source !== root || event.origin !== root.location.origin || !event.data) return;
-      if (event.data.type === 'CLOAK_CONFIG') masker.configure(event.data);
-      if (event.data.type === 'CLOAK_CLEAR_MEMORY') masker.clear();
+      if (event.data.type === 'CLOAK_CONFIG') {
+        enabled = event.data.enabled !== false;
+        masker.configure(event.data);
+        root.console?.info(`[PromptMask] Protection ${enabled ? 'enabled' : 'disabled'}.`);
+      }
+      if (event.data.type === 'CLOAK_CLEAR_MEMORY') {
+        masker.clear();
+        root.console?.info('[PromptMask] Local token vault cleared.');
+      }
     });
 
     root.fetch = async function (input, init) {
@@ -189,6 +202,7 @@
       }
 
       if (containsMediaIntent(body)) {
+        root.console?.info('[PromptMask] Gemini media request detected; sending full prompt without text masking.');
         root.postMessage({ type: 'CLOAK_MEDIA_BYPASS' }, root.location.origin);
         return nativeFetch.call(this, input, init);
       }
@@ -197,6 +211,11 @@
       const rewrittenBody = masker.rewriteBody(body, headers.get('content-type') || '');
       const entries = masker.takePendingEntries();
       if (entries.length) root.postMessage({ type: 'CLOAK_MASKED_DATA', entries }, root.location.origin);
+      if (root.location.hostname === 'gemini.google.com') {
+        root.console?.info(enabled
+          ? `[PromptMask] Gemini request sent with protection enabled; ${entries.length} new sensitive value(s) added to the local vault.`
+          : '[PromptMask] Gemini request sent without masking because protection is disabled.');
+      }
 
       let responseInput = input;
       let responseInit = init;
@@ -206,6 +225,9 @@
         responseInit = { ...(init || {}), body: rewrittenBody };
       }
       const response = await nativeFetch.call(this, responseInput, responseInit);
+      if (root.location.hostname === 'gemini.google.com') {
+        root.console?.info(`[PromptMask] Gemini server responded with HTTP ${response.status}.`);
+      }
       if (!masker.hasMappings() || !response.body || [204, 205, 304].includes(response.status)) return response;
       if (!/(?:text|json|javascript|protobuf|x-ndjson)/i.test(response.headers.get('content-type') || '')) return response;
 
@@ -214,7 +236,24 @@
         responseHeaders.delete('content-length');
         responseHeaders.delete('content-encoding');
         responseHeaders.delete('content-md5');
-        return new Response(restoreStream(response.body, masker, root.TransformStream), {
+        let restoredResponse = '';
+        let responseTruncated = false;
+        const restoredStream = restoreStream(response.body, masker, root.TransformStream, (text) => {
+          if (restoredResponse.length >= 200000) {
+            responseTruncated = true;
+            return;
+          }
+          const remaining = 200000 - restoredResponse.length;
+          restoredResponse += text.slice(0, remaining);
+          if (text.length > remaining) responseTruncated = true;
+        }, () => {
+          if (root.location.hostname === 'gemini.google.com') {
+            root.console?.info(
+              `[PromptMask] Gemini response delivered after local token restoration${responseTruncated ? ' (truncated)' : ''}.\n${restoredResponse}`
+            );
+          }
+        });
+        return new Response(restoredStream, {
           status: response.status,
           statusText: response.statusText,
           headers: responseHeaders

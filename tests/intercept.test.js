@@ -80,14 +80,17 @@ test('detects media intent in URL-encoded request bodies', () => {
 test('fetch wrapper masks the real Gemini payload before sending and restores its response', async () => {
   const listeners = new Map();
   const messages = [];
+  const consoleMessages = [];
   let transmittedPrompt;
   const pageWindow = {
     location: {
       href: 'https://gemini.google.com/app',
-      origin: 'https://gemini.google.com'
+      origin: 'https://gemini.google.com',
+      hostname: 'gemini.google.com'
     },
     Request,
     TransformStream,
+    console: { info: (...args) => consoleMessages.push(args.join(' ')) },
     addEventListener: (type, listener) => listeners.set(type, listener),
     postMessage: (message) => messages.push(message),
     fetch: async (_input, init) => {
@@ -134,4 +137,7 @@ test('fetch wrapper masks the real Gemini payload before sending and restores it
   assert.equal(transmittedPrompt.includes('alex@example.test'), false);
   assert.match(restored, /alex@example\.test/);
   assert.equal(messages.some(({ type }) => type === 'CLOAK_MASKED_DATA'), true);
+  assert.equal(consoleMessages.some((message) => message.includes('Gemini request sent with protection enabled; 1 new sensitive value')), true);
+  assert.equal(consoleMessages.some((message) => message.includes('Gemini server responded with HTTP 200')), true);
+  assert.equal(consoleMessages.some((message) => message.includes('response delivered after local token restoration') && message.includes('alex@example.test')), true);
 });
