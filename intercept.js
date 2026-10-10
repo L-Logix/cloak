@@ -134,7 +134,10 @@
       return false;
     }
     const { hostname, pathname } = parsed;
-    if ((hostname === 'chatgpt.com' || hostname.endsWith('.chatgpt.com')) && /^\/backend-api\/(?:conversation|f\/conversation)(?:\/|$)/.test(pathname)) return true;
+    if ((hostname === 'chatgpt.com' || hostname.endsWith('.chatgpt.com')) && (
+      /^\/backend-api\/(?:conversation|f\/conversation)(?:\/|$)/.test(pathname)
+      || pathname === '/unauth-mweb/conversation/updates'
+    )) return true;
     if (hostname === 'gemini.google.com' && /^\/_\/BardChatUi\/data\//.test(pathname)) return true;
     if ((hostname === 'claude.ai' || hostname.endsWith('.claude.ai')) && /^\/api\/.*\/(?:completion|append_message)$/.test(pathname)) return true;
     return false;

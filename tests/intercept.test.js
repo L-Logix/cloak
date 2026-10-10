@@ -69,6 +69,7 @@ test('targets Gemini, ChatGPT, and Claude chat endpoints only', () => {
   assert.equal(isTargetRequest('https://gemini.google.com/_/BardChatUi/data/StreamGenerate'), true);
   assert.equal(isTargetRequest('https://chatgpt.com/backend-api/conversation'), true);
   assert.equal(isTargetRequest('https://chatgpt.com/backend-api/f/conversation'), true);
+  assert.equal(isTargetRequest('https://chatgpt.com/unauth-mweb/conversation/updates?lightweight_authenticated=0&operationId=test'), true);
   assert.equal(isTargetRequest('https://chatgpt.com/backend-api/sentinel/ping'), false);
   assert.equal(isTargetRequest('https://chatgpt.com/backend-api/telemetry'), false);
   assert.equal(isTargetRequest('https://claude.ai/api/organizations/1/completion'), true);
@@ -155,4 +156,61 @@ test('fetch wrapper masks the real Gemini payload before sending and restores it
   assert.equal(consoleMessages.some((message) => message.includes('Gemini request sent with protection enabled; 1 new sensitive value')), true);
   assert.equal(consoleMessages.some((message) => message.includes('Gemini server responded with HTTP 200')), true);
   assert.equal(consoleMessages.some((message) => message.includes('response delivered after local token restoration') && message.includes('alex@example.test')), true);
+});
+
+test('fetch wrapper masks ChatGPT unauth-mweb conversation updates requests', async () => {
+  const listeners = new Map();
+  let transmittedBody;
+  const pageWindow = {
+    location: {
+      href: 'https://chatgpt.com/',
+      origin: 'https://chatgpt.com',
+      hostname: 'chatgpt.com'
+    },
+    Request,
+    TransformStream,
+    console: { info() {} },
+    addEventListener: (type, listener) => listeners.set(type, listener),
+    postMessage() {},
+    fetch: async (_input, init) => {
+      transmittedBody = JSON.parse(init.body);
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+  };
+  const source = fs.readFileSync(require.resolve('../intercept.js'), 'utf8');
+  vm.runInNewContext(source, {
+    window: pageWindow,
+    URL,
+    URLSearchParams,
+    Headers,
+    Request,
+    Response,
+    TransformStream,
+    TextEncoder,
+    TextDecoder,
+    crypto: { randomUUID: () => 'chat-test' }
+  });
+  listeners.get('message')({
+    source: pageWindow,
+    origin: pageWindow.location.origin,
+    data: { type: 'CLOAK_CONFIG', enabled: true, settings: {} }
+  });
+
+  await pageWindow.fetch(
+    'https://chatgpt.com/unauth-mweb/conversation/updates?lightweight_authenticated=0&operationId=test',
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        prompt: 'hi my name is bob and my phone number is 919-123-4567'
+      })
+    }
+  );
+
+  assert.match(transmittedBody.prompt, /\[PERSON_1_chat-tes\]/);
+  assert.match(transmittedBody.prompt, /\[PHONE_2_chat-tes\]/);
+  assert.equal(transmittedBody.prompt.includes('bob'), false);
+  assert.equal(transmittedBody.prompt.includes('919-123-4567'), false);
 });
