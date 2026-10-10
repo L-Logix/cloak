@@ -68,6 +68,9 @@ test('restores tokens even when a token is split across response chunks', async 
 test('targets Gemini, ChatGPT, and Claude chat endpoints only', () => {
   assert.equal(isTargetRequest('https://gemini.google.com/_/BardChatUi/data/StreamGenerate'), true);
   assert.equal(isTargetRequest('https://chatgpt.com/backend-api/conversation'), true);
+  assert.equal(isTargetRequest('https://chatgpt.com/backend-api/f/conversation'), true);
+  assert.equal(isTargetRequest('https://chatgpt.com/backend-api/sentinel/ping'), false);
+  assert.equal(isTargetRequest('https://chatgpt.com/backend-api/telemetry'), false);
   assert.equal(isTargetRequest('https://claude.ai/api/organizations/1/completion'), true);
   assert.equal(isTargetRequest('https://gemini.google.com/settings'), false);
 });

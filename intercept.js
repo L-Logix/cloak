@@ -134,8 +134,7 @@
       return false;
     }
     const { hostname, pathname } = parsed;
-    // Replace the old ChatGPT check inside isTargetRequest:
-    if ((hostname === 'chatgpt.com' || hostname.endsWith('.chatgpt.com')) && pathname.includes('/backend-api/')) return true;
+    if ((hostname === 'chatgpt.com' || hostname.endsWith('.chatgpt.com')) && /^\/backend-api\/(?:conversation|f\/conversation)(?:\/|$)/.test(pathname)) return true;
     if (hostname === 'gemini.google.com' && /^\/_\/BardChatUi\/data\//.test(pathname)) return true;
     if ((hostname === 'claude.ai' || hostname.endsWith('.claude.ai')) && /^\/api\/.*\/(?:completion|append_message)$/.test(pathname)) return true;
     return false;
