@@ -4,7 +4,7 @@
   const DEFAULT_SETTINGS = { names: true, emails: true, phones: true };
   const EMAIL_PATTERN = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
   const PHONE_PATTERN = /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g;
-  const PERSON_PATTERN = /\b((?:my name is|i am|i'm|this is)\s+)([a-z][a-z]+(?:[-'][a-z]+)?(?:\s+[a-z][a-z]+(?:[-'][a-z]+)?)?)/gi;
+  const PERSON_PATTERN = /\b((?:my name is|i am|i'm|this is)\s+)([a-zA-Z]+(?:[-'][a-zA-Z]+)?(?:\s+[a-zA-Z]+(?:[-'][a-zA-Z]+)?)?)/gi;
   const NAME_STOPWORDS = new Set(['a', 'an', 'and', 'at', 'email', 'for', 'in', 'my', 'number', 'of', 'on', 'or', 'phone', 'the', 'to', 'with']);
   const MEDIA_PATTERN = /\b(?:draw|generate|create|make)\s+(?:me\s+)?(?:an?\s+)?(?:image|picture|photo|illustration|video)\b|\bimage generation\b/i;
 
@@ -134,7 +134,8 @@
       return false;
     }
     const { hostname, pathname } = parsed;
-    if ((hostname === 'chatgpt.com' || hostname.endsWith('.chatgpt.com')) && /^\/backend-api\/(?:conversation|f\/conversation)/.test(pathname)) return true;
+    // Replace the old ChatGPT check inside isTargetRequest:
+    if ((hostname === 'chatgpt.com' || hostname.endsWith('.chatgpt.com')) && pathname.includes('/backend-api/')) return true;
     if (hostname === 'gemini.google.com' && /^\/_\/BardChatUi\/data\//.test(pathname)) return true;
     if ((hostname === 'claude.ai' || hostname.endsWith('.claude.ai')) && /^\/api\/.*\/(?:completion|append_message)$/.test(pathname)) return true;
     return false;
@@ -200,6 +201,9 @@
       if (method !== 'POST' || !isTargetRequest(url, root.location.href)) {
         return nativeFetch.call(this, input, init);
       }
+
+// Place log here where 'url' exists:
+root.console?.info('[Cloak] Intercepted outgoing AI request:', url);
 
       const hasInitBody = init && Object.prototype.hasOwnProperty.call(init, 'body');
       let body = hasInitBody ? init.body : request ? await request.clone().text() : undefined;
