@@ -204,13 +204,11 @@
         return nativeFetch.call(this, input, init);
       }
 
-// Place log here where 'url' exists:
-root.console?.info('[Cloak] Intercepted outgoing AI request:', url);
-
       const hasInitBody = init && Object.prototype.hasOwnProperty.call(init, 'body');
       let body = hasInitBody ? init.body : request ? await request.clone().text() : undefined;
       if (body == null) return nativeFetch.call(this, input, init);
-      if (body instanceof URLSearchParams) body = body.toString();
+  const wasUrlSearchParams = body instanceof URLSearchParams;
+  if (wasUrlSearchParams) body = body.toString();
       if (typeof body !== 'string') {
         throw new TypeError('PromptMask blocked a chat request because its body could not be safely inspected');
       }
@@ -222,6 +220,12 @@ root.console?.info('[Cloak] Intercepted outgoing AI request:', url);
       }
 
       const headers = new Headers(init?.headers || request?.headers || {});
+      if (wasUrlSearchParams && !headers.has('content-type')) {
+        headers.set('content-type', 'application/x-www-form-urlencoded;charset=UTF-8');
+      }
+      root.console?.info(
+        `[Cloak] Intercepted outgoing AI request: ${method} ${new URL(url, root.location.href).pathname}; Content-Type: ${headers.get('content-type') || '(browser default)'}`
+      );
       const rewrittenBody = masker.rewriteBody(body, headers.get('content-type') || '');
       const entries = masker.takePendingEntries();
       if (entries.length) root.postMessage({ type: 'CLOAK_MASKED_DATA', entries }, root.location.origin);
@@ -234,9 +238,9 @@ root.console?.info('[Cloak] Intercepted outgoing AI request:', url);
       let responseInput = input;
       let responseInit = init;
       if (request && !init) {
-        responseInput = new Request(request, { body: rewrittenBody });
+        responseInput = new Request(request, { body: rewrittenBody, headers });
       } else {
-        responseInit = { ...(init || {}), body: rewrittenBody };
+        responseInit = { ...(init || {}), body: rewrittenBody, headers };
       }
       const response = await nativeFetch.call(this, responseInput, responseInit);
       if (root.location.hostname === 'gemini.google.com') {

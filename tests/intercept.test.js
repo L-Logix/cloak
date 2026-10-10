@@ -214,3 +214,56 @@ test('fetch wrapper masks ChatGPT unauth-mweb conversation updates requests', as
   assert.equal(transmittedBody.prompt.includes('bob'), false);
   assert.equal(transmittedBody.prompt.includes('919-123-4567'), false);
 });
+
+test('preserves the inferred form content type when rewriting URLSearchParams', async () => {
+  const listeners = new Map();
+  let sentContentType;
+  let sentBody;
+  const pageWindow = {
+    location: {
+      href: 'https://chatgpt.com/',
+      origin: 'https://chatgpt.com',
+      hostname: 'chatgpt.com'
+    },
+    Request,
+    TransformStream,
+    console: { info() {} },
+    addEventListener: (type, listener) => listeners.set(type, listener),
+    postMessage() {},
+    fetch: async (_input, init) => {
+      sentContentType = new Headers(init.headers).get('content-type');
+      sentBody = new URLSearchParams(init.body).get('prompt');
+      return new Response('ok');
+    }
+  };
+  const source = fs.readFileSync(require.resolve('../intercept.js'), 'utf8');
+  vm.runInNewContext(source, {
+    window: pageWindow,
+    URL,
+    URLSearchParams,
+    Headers,
+    Request,
+    Response,
+    TransformStream,
+    TextEncoder,
+    TextDecoder,
+    crypto: { randomUUID: () => 'form-test' }
+  });
+  listeners.get('message')({
+    source: pageWindow,
+    origin: pageWindow.location.origin,
+    data: { type: 'CLOAK_CONFIG', enabled: true, settings: {} }
+  });
+
+  await pageWindow.fetch(
+    'https://chatgpt.com/unauth-mweb/conversation/updates',
+    {
+      method: 'POST',
+      body: new URLSearchParams({ prompt: 'my name is bob and phone 919-123-4567' })
+    }
+  );
+
+  assert.match(sentContentType, /^application\/x-www-form-urlencoded/i);
+  assert.match(sentBody, /\[PERSON_1_form-tes\]/);
+  assert.match(sentBody, /\[PHONE_2_form-tes\]/);
+});
