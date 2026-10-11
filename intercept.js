@@ -291,6 +291,15 @@ const parseAddress = require('addressit');
       return text;
     }
 
+    function restoreValue(value) {
+      if (typeof value === 'string') return restoreText(value);
+      if (Array.isArray(value)) return value.map(restoreValue);
+      if (value && typeof value === 'object') {
+        return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, restoreValue(child)]));
+      }
+      return value;
+    }
+
     return {
       configure(next) {
         enabled = next.enabled !== false;
@@ -314,6 +323,7 @@ const parseAddress = require('addressit');
       maskText,
       maxTokenLength: () => Math.max(0, ...[...tokenToOriginal.keys()].map((token) => token.length)),
       restoreText,
+      restoreValue,
       rewriteBody,
       tokens: () => [...tokenToOriginal.keys()],
       takePendingEntries: () => pendingEntries.splice(0, pendingEntries.length)
@@ -499,6 +509,91 @@ const parseAddress = require('addressit');
         return response;
       }
     };
+
+    const xhrPrototype = root.XMLHttpRequest?.prototype;
+    if (xhrPrototype) {
+      const nativeOpen = xhrPrototype.open;
+      const nativeSend = xhrPrototype.send;
+      const nativeSetRequestHeader = xhrPrototype.setRequestHeader;
+      const xhrRequests = new WeakMap();
+      const findDescriptor = (prototype, property) => {
+        for (let current = prototype; current; current = Object.getPrototypeOf(current)) {
+          const descriptor = Object.getOwnPropertyDescriptor(current, property);
+          if (descriptor) return descriptor;
+        }
+        return null;
+      };
+      const responseTextDescriptor = findDescriptor(xhrPrototype, 'responseText');
+      const responseDescriptor = findDescriptor(xhrPrototype, 'response');
+
+      xhrPrototype.open = function (method, url, ...args) {
+        xhrRequests.set(this, {
+          method: String(method || 'GET').toUpperCase(),
+          url: String(url),
+          headers: new Headers()
+        });
+        return nativeOpen.call(this, method, url, ...args);
+      };
+
+      xhrPrototype.setRequestHeader = function (name, value) {
+        const requestInfo = xhrRequests.get(this);
+        if (requestInfo) {
+          try { requestInfo.headers.set(name, value); } catch { /* Keep native XHR header behavior. */ }
+        }
+        return nativeSetRequestHeader.call(this, name, value);
+      };
+
+      xhrPrototype.send = function (body) {
+        const requestInfo = xhrRequests.get(this);
+        if (!requestInfo || requestInfo.method !== 'POST' || !isTargetRequest(requestInfo.url, root.location.href) || body == null) {
+          return nativeSend.call(this, body);
+        }
+
+        const wasUrlSearchParams = body instanceof root.URLSearchParams;
+        const originalBody = wasUrlSearchParams ? body.toString() : body;
+        if (typeof originalBody !== 'string') return nativeSend.call(this, body);
+        if (containsMediaIntent(originalBody)) {
+          root.console?.info('[Cloak] Gemini media request bypassed text masking.');
+          root.postMessage({ type: 'CLOAK_MEDIA_BYPASS' }, root.location.origin);
+          return nativeSend.call(this, body);
+        }
+
+        if (wasUrlSearchParams && !requestInfo.headers.has('content-type')) {
+          const contentType = 'application/x-www-form-urlencoded;charset=UTF-8';
+          requestInfo.headers.set('content-type', contentType);
+          nativeSetRequestHeader.call(this, 'Content-Type', contentType);
+        }
+
+        const rewrittenBody = masker.rewriteBody(originalBody, requestInfo.headers.get('content-type') || '');
+        const maskedCount = masker.takeMaskedCount();
+        const entries = masker.takePendingEntries();
+        root.console?.info(
+          `[Cloak] Intercepted XHR ${requestInfo.method} ${new URL(requestInfo.url, root.location.href).pathname}; categories=${masker.activeCategories().join(',')}; values replaced=${maskedCount}; payload changed=${rewrittenBody !== originalBody}.`
+        );
+        root.postMessage({ type: 'CLOAK_REQUEST_STATS', requestsChecked: 1, valuesMasked: maskedCount }, root.location.origin);
+        if (entries.length) root.postMessage({ type: 'CLOAK_MASKED_DATA', entries }, root.location.origin);
+
+        const responseType = this.responseType || '';
+        const addRestoredGetter = (property, descriptor) => {
+          if (!descriptor?.get) return;
+          try {
+            Object.defineProperty(this, property, {
+              configurable: true,
+              enumerable: descriptor.enumerable,
+              get() {
+                const result = descriptor.get.call(this);
+                return masker.restoreValue(result);
+              }
+            });
+          } catch {
+            root.console?.warn(`[Cloak] Could not restore XMLHttpRequest ${property}; response tokens may remain visible.`);
+          }
+        };
+        if (responseType === '' || responseType === 'text') addRestoredGetter('responseText', responseTextDescriptor);
+        if (responseType === '' || responseType === 'text' || responseType === 'json') addRestoredGetter('response', responseDescriptor);
+        return nativeSend.call(this, rewrittenBody);
+      };
+    }
   }
 
   if (typeof process !== 'undefined' && process.versions?.node && typeof module !== 'undefined') {

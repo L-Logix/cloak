@@ -207,8 +207,8 @@ test('fetch wrapper masks the real Gemini payload before sending and restores it
       const params = new URLSearchParams(init.body);
       const outer = JSON.parse(params.get('f.req'));
       transmittedPrompt = JSON.parse(outer[1])[0][0];
-      const token = transmittedPrompt.match(/\[EMAIL_[^\]]+\]/)[0];
-      return new Response(`data: ${JSON.stringify({ text: token })}\n\n`, {
+      const tokens = transmittedPrompt.match(/\[(?:PERSON|EMAIL|PHONE)_[^\]]+\]/g) || [];
+      return new Response(`data: ${JSON.stringify({ text: tokens.join(' | ') })}\n\n`, {
         headers: { 'content-type': 'text/event-stream' }
       });
     }
@@ -233,9 +233,18 @@ test('fetch wrapper masks the real Gemini payload before sending and restores it
     data: { type: 'CLOAK_CONFIG', enabled: true, settings: {} }
   });
 
-  const nested = JSON.stringify([['Contact alex@example.test']]);
+  const prompt = 'my name is bob and my phone number is 919-123-4567; contact alex@example.test';
+  const nested = JSON.stringify([
+    [prompt, 0, null, null, null, null, 0],
+    ['en'],
+    null,
+    'opaque-token',
+    'response-id',
+    null,
+    [1]
+  ]);
   const response = await pageWindow.fetch(
-    'https://gemini.google.com/_/BardChatUi/data/StreamGenerate',
+    'https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate?bl=test&f.sid=1&hl=en&_reqid=2&rt=c',
     {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -244,13 +253,111 @@ test('fetch wrapper masks the real Gemini payload before sending and restores it
   );
   const restored = await response.text();
 
-  assert.match(transmittedPrompt, /\[EMAIL_1_test-ses\]/);
+  assert.match(transmittedPrompt, /\[PERSON_[^\]]+\]/);
+  assert.match(transmittedPrompt, /\[PHONE_[^\]]+\]/);
+  assert.match(transmittedPrompt, /\[EMAIL_[^\]]+\]/);
+  assert.equal(transmittedPrompt.includes('bob'), false);
+  assert.equal(transmittedPrompt.includes('919-123-4567'), false);
   assert.equal(transmittedPrompt.includes('alex@example.test'), false);
+  assert.match(restored, /bob/);
+  assert.match(restored, /919-123-4567/);
   assert.match(restored, /alex@example\.test/);
   assert.equal(messages.some(({ type }) => type === 'CLOAK_MASKED_DATA'), true);
-  assert.equal(consoleMessages.some((message) => message.includes('Gemini request sent with protection enabled; 1 new sensitive value')), true);
+  assert.equal(consoleMessages.some((message) => message.includes('Gemini request sent with protection enabled; 3 new sensitive value')), true);
   assert.equal(consoleMessages.some((message) => message.includes('Gemini server responded with HTTP 200')), true);
   assert.equal(consoleMessages.some((message) => message.includes('response delivered after local token restoration') && message.includes('alex@example.test')), true);
+});
+
+test('XMLHttpRequest masks Gemini StreamGenerate f.req and restores response getters', () => {
+  const listeners = new Map();
+  const messages = [];
+  class MockXHR {
+    constructor() {
+      this.headers = {};
+      this.responseType = '';
+      this.status = 200;
+      this._responseText = '';
+    }
+    open(method, url) {
+      this.method = method;
+      this.url = url;
+    }
+    setRequestHeader(name, value) {
+      this.headers[name.toLowerCase()] = value;
+    }
+    send(body) {
+      this.sentBody = body;
+      const params = new URLSearchParams(body);
+      const outer = JSON.parse(params.get('f.req'));
+      const prompt = JSON.parse(outer[1])[0][0];
+      const tokens = prompt.match(/\[(?:PERSON|PHONE)_[^\]]+\]/g) || [];
+      this._responseText = `reply ${tokens.join(' ')}`;
+    }
+  }
+  Object.defineProperty(MockXHR.prototype, 'responseText', {
+    configurable: true,
+    get() { return this._responseText; }
+  });
+  Object.defineProperty(MockXHR.prototype, 'response', {
+    configurable: true,
+    get() { return this._responseText; }
+  });
+
+  const pageWindow = {
+    location: {
+      href: 'https://gemini.google.com/app',
+      origin: 'https://gemini.google.com',
+      hostname: 'gemini.google.com'
+    },
+    XMLHttpRequest: MockXHR,
+    URL,
+    URLSearchParams,
+    Headers,
+    Request,
+    Response,
+    TransformStream,
+    console: { info() {}, warn() {} },
+    addEventListener: (type, listener) => listeners.set(type, listener),
+    postMessage: (message) => messages.push(message),
+    fetch: async () => new Response('ok')
+  };
+  const source = fs.readFileSync(require.resolve('../intercept.bundle.js'), 'utf8');
+  vm.runInNewContext(source, {
+    require,
+    window: pageWindow,
+    URL,
+    URLSearchParams,
+    Headers,
+    Request,
+    Response,
+    TransformStream,
+    TextEncoder,
+    TextDecoder,
+    crypto: { randomUUID: () => 'xhr-test' }
+  });
+  listeners.get('message')({
+    source: pageWindow,
+    origin: pageWindow.location.origin,
+    data: { type: 'CLOAK_CONFIG', enabled: true, settings: {} }
+  });
+
+  const prompt = 'my name is bob and my phone number is 919-123-4567';
+  const nested = JSON.stringify([[prompt, 0, null, null, null, null, 0], ['en']]);
+  const xhr = new pageWindow.XMLHttpRequest();
+  xhr.open('POST', 'https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate');
+  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded;charset=UTF-8');
+  xhr.send(new URLSearchParams({ 'f.req': JSON.stringify([null, nested]) }));
+
+  const sentOuter = JSON.parse(new URLSearchParams(xhr.sentBody).get('f.req'));
+  const sentPrompt = JSON.parse(sentOuter[1])[0][0];
+  assert.match(sentPrompt, /\[PERSON_1_xhr-test\]/);
+  assert.match(sentPrompt, /\[PHONE_2_xhr-test\]/);
+  assert.equal(sentPrompt.includes('bob'), false);
+  assert.equal(sentPrompt.includes('919-123-4567'), false);
+  assert.match(xhr.responseText, /bob/);
+  assert.match(xhr.responseText, /919-123-4567/);
+  assert.equal(xhr.response, xhr.responseText);
+  assert.equal(messages.some(({ type }) => type === 'CLOAK_MASKED_DATA'), true);
 });
 
 test('fetch wrapper masks ChatGPT unauth-mweb conversation updates requests', async () => {
