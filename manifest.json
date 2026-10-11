@@ -40,7 +40,7 @@
         "*://claude.ai/*",
         "*://*.claude.ai/*"
       ],
-      "js": ["intercept.js"],
+      "js": ["intercept.bundle.js"],
       "run_at": "document_start",
       "world": "MAIN"
     }

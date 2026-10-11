@@ -1,3 +1,6 @@
+const nlp = require('compromise');
+const parseAddress = require('addressit');
+
 (function (root) {
   'use strict';
 
@@ -11,11 +14,179 @@
   };
   const EMAIL_PATTERN = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
   const PHONE_PATTERN = /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g;
-  const PERSON_PATTERN = /\b((?:my name is|i am|i'm|this is)\s+)([a-zA-Z]+(?:[-'][a-zA-Z]+)?(?:\s+[a-zA-Z]+(?:[-'][a-zA-Z]+)?)?)/gi;
-  const TITLED_PERSON_PATTERN = /\b((?:principal|professor|doctor|dr\.?|mr\.?|mrs\.?|ms\.?|miss|coach|teacher)\s+)([a-z]+(?:[-'][a-z]+)?(?:\s+[a-z]+(?:[-'][a-z]+)?)?)/gi;
-  const ADDRESS_PATTERN = /\b\d{1,6}\s+(?:(?:north|south|east|west|n\.?|s\.?|e\.?|w\.?)\s+)?(?:[a-z0-9]+(?:['-][a-z0-9]+)?\s+){0,5}(?:street|st\.?|avenue|ave\.?|road|rd\.?|boulevard|blvd\.?|lane|ln\.?|drive|dr\.?|court|ct\.?|circle|cir\.?|way|parkway|pkwy\.?|terrace|ter\.?|place|pl\.?|trail|trl\.?)\b\.?(?:,?\s+[a-z]{2}\s+\d{5}(?:-\d{4})?)?/gi;
-  const NAME_STOPWORDS = new Set(['a', 'an', 'and', 'at', 'email', 'for', 'in', 'my', 'number', 'of', 'on', 'or', 'phone', 'the', 'to', 'with']);
+  const PERSON_INTRODUCER = /\b(?:my name is|i am|i'm|this is)\s+([\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*){0,3})/giu;
+  const RECIPIENT_CUE = /\bto\s+([^,.;!?\n]+?)\s+at\b/giu;
+  const UK_POSTCODE = /\b(?:GIR\s?0AA|[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2})\b/i;
+  const NAME_STOPWORDS = new Set(['a', 'an', 'and', 'at', 'email', 'for', 'in', 'is', 'my', 'name', 'number', 'of', 'on', 'or', 'phone', 'the', 'to', 'with']);
   const MEDIA_PATTERN = /\b(?:draw|generate|create|make)\s+(?:me\s+)?(?:an?\s+)?(?:image|picture|photo|illustration|video)\b|\bimage generation\b/i;
+
+  function escapeRegExp(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function personCandidates(text) {
+    const candidates = new Set();
+    try {
+      for (const name of nlp(text).people().out('array')) {
+        if (typeof name !== 'string') continue;
+        const cleaned = name.replace(/^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu, '').trim();
+        if (cleaned) candidates.add(cleaned);
+      }
+    } catch {
+      // Contextual extraction below remains available if the NLP pass fails.
+    }
+
+    for (const match of text.matchAll(PERSON_INTRODUCER)) {
+      const words = match[1].trim().split(/\s+/);
+      while (words.length > 1 && NAME_STOPWORDS.has(words.at(-1).toLowerCase())) words.pop();
+      if (words.length && !NAME_STOPWORDS.has(words[0].toLowerCase())) candidates.add(words.join(' '));
+    }
+
+    for (const match of text.matchAll(RECIPIENT_CUE)) {
+      const recipient = match[1].trim();
+      if (!recipient || recipient.includes('[')) continue;
+      let recognized = [];
+      try {
+        recognized = nlp(recipient).people().out('array');
+      } catch {
+        recognized = [];
+      }
+      if (recognized.length) {
+        recognized.forEach((name) => candidates.add(name.trim()));
+      } else {
+        const words = recipient.split(/\s+/).filter((word) => !NAME_STOPWORDS.has(word.toLowerCase()));
+        if (words.length) candidates.add(words.slice(-3).join(' '));
+      }
+    }
+    return [...candidates].sort((a, b) => b.length - a.length);
+  }
+
+  function findPersonSpans(text) {
+    const spans = [];
+    for (const candidate of personCandidates(text)) {
+      const expression = new RegExp(`(?<![\\p{L}\\p{N}_])${escapeRegExp(candidate)}(?![\\p{L}\\p{N}_])`, 'giu');
+      for (const match of text.matchAll(expression)) {
+        if (match[0].includes('[')) continue;
+        if (!spans.some(({ start, end }) => match.index < end && match.index + match[0].length > start)) {
+          spans.push({ start: match.index, end: match.index + match[0].length, value: match[0], category: 'PERSON' });
+        }
+      }
+    }
+    return spans.sort((a, b) => b.start - a.start);
+  }
+
+  function extendAddressSpan(candidate, parsed, streetEnd) {
+    const placeMatches = [];
+    for (const region of parsed.regions || []) {
+      let places = [];
+      try {
+        places = nlp(region).places().out('array');
+      } catch {
+        places = [];
+      }
+      for (const place of places) {
+        const cleanPlace = String(place).replace(/[\p{P}\p{S}]+$/gu, '').trim();
+        if (!cleanPlace) continue;
+        const index = candidate.toLocaleLowerCase().indexOf(cleanPlace.toLocaleLowerCase(), streetEnd);
+        if (index >= streetEnd) placeMatches.push({ start: index, end: index + cleanPlace.length });
+      }
+    }
+    placeMatches.sort((a, b) => a.start - b.start);
+
+    let spanEnd = streetEnd;
+    for (const place of placeMatches) {
+      if (place.start < spanEnd) continue;
+      if (!/^[\s,]*$/.test(candidate.slice(spanEnd, place.start))) continue;
+      spanEnd = place.end;
+      while (true) {
+        const suffix = candidate.slice(spanEnd);
+        const separator = suffix.match(/^[\s,]*/)?.[0] || '';
+        const remainder = suffix.slice(separator.length);
+        let metadata = '';
+        if (parsed.state && remainder.startsWith(parsed.state) && !/[\p{L}]/u.test(remainder[parsed.state.length] || '')) {
+          metadata = parsed.state;
+        }
+        if (metadata) {
+          spanEnd += separator.length + metadata.length;
+          continue;
+        }
+        if (parsed.postalcode && remainder.toLocaleLowerCase().startsWith(String(parsed.postalcode).toLocaleLowerCase())) {
+          const end = String(parsed.postalcode).length;
+          if (!/[\p{L}\d]/u.test(remainder[end] || '')) {
+            spanEnd += separator.length + end;
+            continue;
+          }
+        }
+        const ukPostcode = remainder.match(UK_POSTCODE);
+        if (ukPostcode && ukPostcode.index === 0) {
+          spanEnd += separator.length + ukPostcode[0].length;
+          continue;
+        }
+        break;
+      }
+    }
+
+    if (parsed.state && parsed.postalcode) {
+      const postalcode = String(parsed.postalcode);
+      const postalIndex = candidate.indexOf(postalcode, streetEnd);
+      const stateIndex = postalIndex < 0
+        ? -1
+        : candidate.lastIndexOf(String(parsed.state), postalIndex);
+      if (stateIndex >= streetEnd && postalIndex > stateIndex) {
+        const cityAndState = candidate.slice(streetEnd, stateIndex);
+        const stateToPostal = candidate.slice(stateIndex + String(parsed.state).length, postalIndex);
+        if (
+          cityAndState.length <= 100
+          && /^[,\s]+(?:[\p{L}\p{M}'’.-]+[,\s]*){1,8}$/u.test(cityAndState)
+          && /^[,\s]+$/.test(stateToPostal)
+        ) {
+          spanEnd = Math.max(spanEnd, postalIndex + postalcode.length);
+        }
+      }
+    }
+
+    return spanEnd;
+  }
+
+  function findAddressSpans(text) {
+    const spans = [];
+    const numberPattern = /\b\d{1,6}[a-z]?\b/gi;
+    let numberMatch;
+    let checked = 0;
+    while ((numberMatch = numberPattern.exec(text)) && checked < 40) {
+      checked += 1;
+      const start = numberMatch.index;
+      const limit = Math.min(text.length, start + 240);
+      const boundaryMatch = text.slice(start, limit).match(/[\n;!?]/);
+      const endLimit = boundaryMatch ? start + boundaryMatch.index : limit;
+      const tail = text.slice(start, endLimit);
+      const words = [...tail.matchAll(/\S+/g)].slice(0, 24);
+      let bestEnd = 0;
+      for (let wordIndex = 1; wordIndex < words.length; wordIndex += 1) {
+        const candidateEnd = words[wordIndex].index + words[wordIndex][0].length;
+        const candidate = tail.slice(0, candidateEnd);
+        let parsed;
+        try {
+          parsed = parseAddress(candidate);
+        } catch {
+          continue;
+        }
+        if (String(parsed.number || '') !== numberMatch[0] || !parsed.street) continue;
+        const streetStart = candidate.toLocaleLowerCase().lastIndexOf(String(parsed.street).toLocaleLowerCase());
+        if (streetStart < numberMatch[0].length) continue;
+        const streetEnd = streetStart + String(parsed.street).length;
+        const addressEnd = extendAddressSpan(candidate, parsed, streetEnd);
+        bestEnd = Math.max(bestEnd, addressEnd);
+      }
+      if (bestEnd > 0) {
+        const absoluteEnd = start + bestEnd;
+        if (!spans.some(({ start: priorStart, end: priorEnd }) => start < priorEnd && absoluteEnd > priorStart)) {
+          spans.push({ start, end: absoluteEnd, value: text.slice(start, absoluteEnd), category: 'ADDRESS' });
+        }
+      }
+    }
+    return spans.sort((a, b) => b.start - a.start);
+  }
 
   function createMasker() {
     let settings = { ...DEFAULT_SETTINGS };
@@ -41,22 +212,17 @@
       if (!enabled || typeof value !== 'string') return value;
       let text = value;
       if (settings.names) {
-        const maskName = (match, prefix, name) => {
-          const words = name.split(/\s+/);
-          while (words.length > 1 && NAME_STOPWORDS.has(words.at(-1).toLowerCase())) words.pop();
-          if (NAME_STOPWORDS.has(words[0].toLowerCase())) return match;
-          const matchedName = words.join(' ');
-          const trailingText = name.slice(matchedName.length);
+        for (const span of findPersonSpans(text)) {
           maskedCount += 1;
-          return `${prefix}${register('PERSON', matchedName)}${trailingText}`;
-        };
-        text = text.replace(TITLED_PERSON_PATTERN, maskName);
-        text = text.replace(PERSON_PATTERN, maskName);
+          text = `${text.slice(0, span.start)}${register('PERSON', span.value)}${text.slice(span.end)}`;
+        }
       }
-      if (settings.addresses) text = text.replace(ADDRESS_PATTERN, (address) => {
-        maskedCount += 1;
-        return register('ADDRESS', address);
-      });
+      if (settings.addresses) {
+        for (const span of findAddressSpans(text)) {
+          maskedCount += 1;
+          text = `${text.slice(0, span.start)}${register('ADDRESS', span.value)}${text.slice(span.end)}`;
+        }
+      }
       if (settings.emails) text = text.replace(EMAIL_PATTERN, (email) => {
         maskedCount += 1;
         return register('EMAIL', email);
@@ -127,6 +293,7 @@
       },
       hasMappings: () => tokenToOriginal.size > 0,
       shouldRestoreResponses: () => settings.restoreResponses !== false,
+      activeCategories: () => ['names', 'emails', 'phones', 'addresses'].filter((category) => settings[category] !== false),
       takeMaskedCount: () => {
         const count = maskedCount;
         maskedCount = 0;
@@ -258,6 +425,10 @@
       );
       const rewrittenBody = masker.rewriteBody(body, headers.get('content-type') || '');
       const maskedCount = masker.takeMaskedCount();
+      const activeCategories = masker.activeCategories();
+      root.console?.info(
+        `[Cloak] Request inspected; protection=${enabled ? 'on' : 'off'}; categories=${activeCategories.join(',') || 'none'}; values replaced=${maskedCount}; payload changed=${rewrittenBody !== body}.`
+      );
       root.postMessage({
         type: 'CLOAK_REQUEST_STATS',
         requestsChecked: 1,

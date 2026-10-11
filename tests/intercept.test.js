@@ -52,13 +52,58 @@ test('masks a name after a title and a US street address in the reported prompt'
   const masked = masker.maskText(original);
   const entries = masker.takePendingEntries();
 
-  assert.match(masked, /principal \[PERSON_1_[a-z0-9-]+\] at \[ADDRESS_2_[a-z0-9-]+\].*\[EMAIL_3_[a-z0-9-]+\]/i);
-  assert.equal(masked.includes('chadwick'), false);
+  assert.match(masked, /\[PERSON_1_[a-z0-9-]+\] at \[ADDRESS_2_[a-z0-9-]+\].*\[EMAIL_3_[a-z0-9-]+\]/i);
+  assert.equal(masked.includes('principal chadwick'), false);
   assert.equal(masked.includes('123 reedy creek ln'), false);
   assert.deepEqual(entries.map(({ original: value }) => value), [
-    'chadwick', '123 reedy creek ln', 'alex@example.test'
+    'principal chadwick', '123 reedy creek ln', 'alex@example.test'
   ]);
   assert.equal(masker.restoreText(masked), original);
+});
+
+test('masks title name and address in reported payload when email is already tokenized', () => {
+  const masker = createMasker();
+  const original = '1. write an email to principal chadwick at 123 reedy creek ln saying i need my psat test scores back at [EMAIL_3_ea931cb0]\n2.';
+  const body = JSON.stringify({ prompt: original });
+  const rewrittenBody = masker.rewriteBody(body, 'application/json');
+  const prompt = JSON.parse(rewrittenBody).prompt;
+
+  assert.match(prompt, /\[PERSON_1_[a-z0-9-]+\] at \[ADDRESS_2_[a-z0-9-]+\]/i);
+  assert.match(prompt, /\[EMAIL_3_ea931cb0\]/);
+  assert.equal(prompt.includes('principal chadwick'), false);
+  assert.equal(prompt.includes('123 reedy creek ln'), false);
+  assert.equal(masker.takeMaskedCount(), 2);
+});
+
+test('recognizes generic person names and international address formats locally', () => {
+  const masker = createMasker();
+  const original = 'Please send the package to Dr. Noam Chomsky at 221B Baker Street, London NW1 6XE, United Kingdom.';
+  const rewritten = JSON.parse(masker.rewriteBody(JSON.stringify({ prompt: original }))).prompt;
+  const entries = masker.takePendingEntries();
+
+  assert.equal(entries[0].original, 'Dr. Noam Chomsky');
+  assert.match(entries[1].original, /^221B Baker Street, London NW1 6XE, United Kingdom$/);
+  assert.match(rewritten, /\[PERSON_1_[a-z0-9-]+\] at \[ADDRESS_2_[a-z0-9-]+\]\./i);
+  assert.equal(masker.restoreText(rewritten), original);
+});
+
+test('masks parsed US city state and ZIP without swallowing following prose', () => {
+  const masker = createMasker();
+  const original = 'Alex Kim lives at 742 Evergreen Terrace, Springfield, IL 62704. Please email soon.';
+  const rewritten = JSON.parse(masker.rewriteBody(JSON.stringify({ prompt: original }))).prompt;
+  const entries = masker.takePendingEntries();
+
+  assert.equal(entries[0].original, 'Alex Kim');
+  assert.equal(entries[1].original, '742 Evergreen Terrace, Springfield, IL 62704');
+  assert.equal(rewritten, `${entries[0].token} lives at ${entries[1].token}. Please email soon.`);
+  assert.equal(masker.restoreText(rewritten), original);
+});
+
+test('does not mask numbers that do not parse as street addresses', () => {
+  const masker = createMasker();
+  const original = 'I have 123 items and 42 test scores.';
+  assert.equal(masker.maskText(original), original);
+  assert.equal(masker.takePendingEntries().length, 0);
 });
 
 test('rewrites Gemini f.req form payloads containing nested JSON', () => {
@@ -152,8 +197,9 @@ test('fetch wrapper masks the real Gemini payload before sending and restores it
       });
     }
   };
-  const source = fs.readFileSync(require.resolve('../intercept.js'), 'utf8');
+  const source = fs.readFileSync(require.resolve('../intercept.bundle.js'), 'utf8');
   vm.runInNewContext(source, {
+    require,
     window: pageWindow,
     URL,
     URLSearchParams,
@@ -194,6 +240,7 @@ test('fetch wrapper masks the real Gemini payload before sending and restores it
 test('fetch wrapper masks ChatGPT unauth-mweb conversation updates requests', async () => {
   const listeners = new Map();
   const messages = [];
+  const diagnostics = [];
   let transmittedBody;
   const pageWindow = {
     location: {
@@ -203,7 +250,7 @@ test('fetch wrapper masks ChatGPT unauth-mweb conversation updates requests', as
     },
     Request,
     TransformStream,
-    console: { info() {} },
+    console: { info(message) { diagnostics.push(message); } },
     addEventListener: (type, listener) => listeners.set(type, listener),
     postMessage(message) { messages.push(message); },
     fetch: async (_input, init) => {
@@ -213,8 +260,9 @@ test('fetch wrapper masks ChatGPT unauth-mweb conversation updates requests', as
       });
     }
   };
-  const source = fs.readFileSync(require.resolve('../intercept.js'), 'utf8');
+  const source = fs.readFileSync(require.resolve('../intercept.bundle.js'), 'utf8');
   vm.runInNewContext(source, {
+    require,
     window: pageWindow,
     URL,
     URLSearchParams,
@@ -238,18 +286,20 @@ test('fetch wrapper masks ChatGPT unauth-mweb conversation updates requests', as
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        prompt: 'hi my name is bob and my phone number is 919-123-4567'
+        prompt: '1. write an email to principal chadwick at 123 reedy creek ln saying i need my psat test scores back at [EMAIL_3_ea931cb0]\n2.'
       })
     }
   );
 
-  assert.match(transmittedBody.prompt, /\[PERSON_1_chat-tes\]/);
-  assert.match(transmittedBody.prompt, /\[PHONE_2_chat-tes\]/);
-  assert.equal(transmittedBody.prompt.includes('bob'), false);
-  assert.equal(transmittedBody.prompt.includes('919-123-4567'), false);
+  assert.match(transmittedBody.prompt, /\[PERSON_1_chat-tes\] at \[ADDRESS_2_chat-tes\]/);
+  assert.match(transmittedBody.prompt, /\[EMAIL_3_ea931cb0\]/);
+  assert.equal(transmittedBody.prompt.includes('principal chadwick'), false);
+  assert.equal(transmittedBody.prompt.includes('123 reedy creek ln'), false);
   const statsMessage = messages.find(({ type }) => type === 'CLOAK_REQUEST_STATS');
   assert.equal(statsMessage.requestsChecked, 1);
   assert.equal(statsMessage.valuesMasked, 2);
+  assert.equal(diagnostics.some((message) => message.includes('categories=names,emails,phones,addresses') && message.includes('values replaced=2') && message.includes('payload changed=true')), true);
+  assert.equal(diagnostics.some((message) => message.includes('chadwick') || message.includes('123 reedy creek ln')), false);
 });
 
 test('preserves the inferred form content type when rewriting URLSearchParams', async () => {
@@ -273,8 +323,9 @@ test('preserves the inferred form content type when rewriting URLSearchParams', 
       return new Response('ok');
     }
   };
-  const source = fs.readFileSync(require.resolve('../intercept.js'), 'utf8');
+  const source = fs.readFileSync(require.resolve('../intercept.bundle.js'), 'utf8');
   vm.runInNewContext(source, {
+    require,
     window: pageWindow,
     URL,
     URLSearchParams,
