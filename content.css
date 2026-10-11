@@ -1,0 +1,65 @@
+.cloak-mask-badge {
+  position: fixed;
+  z-index: 2147483646;
+  display: inline-grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border: 1px solid #aab4ad;
+  border-radius: 50%;
+  color: #61716a;
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(16 35 25 / 12%);
+  opacity: .82;
+  pointer-events: none;
+  transition: color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.cloak-mask-badge[data-active="true"] {
+  border-color: #6aabdb;
+  color: #2879b8;
+  box-shadow: 0 0 0 3px rgb(72 153 213 / 13%), 0 2px 8px rgb(16 35 25 / 12%);
+}
+
+.cloak-mask-badge svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cloak-media-banner {
+  position: fixed;
+  z-index: 2147483647;
+  bottom: 86px;
+  width: min(420px, calc(100vw - 32px));
+  padding: 12px 15px;
+  transform: translate(-50%, 12px);
+  border: 1px solid #e3d8aa;
+  border-radius: 7px;
+  color: #3e3a28;
+  background: #fffbe9;
+  box-shadow: 0 8px 28px rgb(26 31 22 / 15%);
+  font: 13px/1.45 "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.cloak-media-banner[data-visible="true"] {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  .cloak-mask-badge { border-color: #63716a; color: #c0cbc3; background: #222b25; }
+  .cloak-mask-badge[data-active="true"] { border-color: #70b6e8; color: #86c8f4; }
+  .cloak-media-banner { border-color: #645c3c; color: #f0e9cc; background: #302d20; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cloak-mask-badge, .cloak-media-banner { transition-duration: .01ms; }
+}
