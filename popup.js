@@ -15,7 +15,6 @@ const SUPPORTED_SITES = [
 const ui = {
   masterToggle: document.getElementById('master-toggle'),
   powerLabel: document.getElementById('power-label'),
-  powerState: document.getElementById('power-state'),
   protectionDetail: document.getElementById('protection-detail'),
   siteStatus: document.getElementById('site-status'),
   statusLabel: document.getElementById('status-label'),
@@ -24,6 +23,7 @@ const ui = {
   valuesMasked: document.getElementById('values-masked'),
   requestsChecked: document.getElementById('requests-checked'),
   vaultCount: document.getElementById('vault-count'),
+  vaultSearch: document.getElementById('vault-search'),
   vaultList: document.getElementById('vault-list'),
   clearVault: document.getElementById('clear-vault'),
   vaultMessage: document.getElementById('vault-message'),
@@ -37,12 +37,15 @@ let state = {
   enabled: true,
   settings: { ...DEFAULT_SETTINGS },
   vault: {},
+  vaultQuery: '',
+  revealedTokens: new Set(),
   stats: { requestsChecked: 0, valuesMasked: 0 },
   site: null
 };
 let messageTimeout;
 
 function showPage(pageName) {
+  if (ui.pages.find((page) => page.dataset.pageView === pageName)?.hidden === false) return;
   for (const page of ui.pages) {
     page.hidden = page.dataset.pageView !== pageName;
   }
@@ -122,7 +125,6 @@ function render() {
   ui.masterToggle.setAttribute('aria-checked', String(state.enabled));
   ui.masterToggle.dataset.enabled = String(state.enabled);
   ui.powerLabel.textContent = state.enabled ? 'Cloak protection on' : 'Cloak protection paused';
-  ui.powerState.textContent = state.enabled ? 'ON' : 'OFF';
   ui.masterToggle.setAttribute('aria-label', state.enabled ? 'Turn Cloak protection off' : 'Turn Cloak protection on');
   ui.protectionDetail.textContent = state.enabled
     ? 'Sensitive details are checked on this device.'
@@ -143,6 +145,10 @@ function render() {
   }
 
   const entries = Object.entries(state.vault || {});
+  const query = state.vaultQuery.trim().toLocaleLowerCase();
+  const visibleEntries = entries.filter(([token, original]) =>
+    !query || token.toLocaleLowerCase().includes(query) || String(original).toLocaleLowerCase().includes(query)
+  );
   const categories = ['names', 'emails', 'phones', 'addresses'];
   ui.coverageTotal.textContent = `${categories.filter((category) => state.settings[category] !== false).length} active`;
   ui.vaultCount.textContent = String(entries.length);
@@ -151,13 +157,15 @@ function render() {
   renderOdometer(ui.valuesMasked, state.stats.valuesMasked);
   renderOdometer(ui.requestsChecked, state.stats.requestsChecked);
 
-  if (entries.length === 0) {
+  if (entries.length === 0 || visibleEntries.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'empty-vault';
-    empty.textContent = 'Nothing masked yet. Your tokens will appear here.';
+    empty.textContent = entries.length === 0
+      ? 'Nothing masked yet. Your tokens will appear here.'
+      : 'No vault entries match that search.';
     ui.vaultList.append(empty);
   } else {
-    for (const [token, original] of entries) {
+    for (const [token, original] of visibleEntries) {
       const row = document.createElement('div');
       row.className = 'vault-row';
       const tokenLabel = document.createElement('code');
@@ -169,8 +177,16 @@ function render() {
       arrow.textContent = '\u2192';
       const value = document.createElement('span');
       value.className = 'vault-value';
-      value.textContent = String(original);
-      row.append(tokenLabel, arrow, value);
+      const revealed = state.revealedTokens.has(token);
+      value.textContent = revealed ? String(original) : '••••••••';
+      value.classList.toggle('is-hidden', !revealed);
+      const revealButton = document.createElement('button');
+      revealButton.className = 'vault-reveal';
+      revealButton.type = 'button';
+      revealButton.dataset.revealToken = token;
+      revealButton.setAttribute('aria-pressed', String(revealed));
+      revealButton.textContent = revealed ? 'Hide' : 'Reveal';
+      row.append(tokenLabel, arrow, value, revealButton);
       ui.vaultList.append(row);
     }
   }
@@ -182,6 +198,20 @@ function render() {
 
 ui.navigation.forEach((button) => {
   button.addEventListener('click', () => showPage(button.dataset.pageTarget));
+});
+
+ui.vaultSearch.addEventListener('input', () => {
+  state.vaultQuery = ui.vaultSearch.value;
+  render();
+});
+
+ui.vaultList.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-reveal-token]');
+  if (!button) return;
+  const token = button.dataset.revealToken;
+  if (state.revealedTokens.has(token)) state.revealedTokens.delete(token);
+  else state.revealedTokens.add(token);
+  render();
 });
 
 function save(changes) {

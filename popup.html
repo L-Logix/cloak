@@ -24,19 +24,18 @@
 
     <div class="page-stage">
       <section class="page-view home-view" data-page-view="home" aria-labelledby="home-heading">
-        <button class="power-control" id="master-toggle" type="button" role="switch" aria-checked="true" aria-label="Cloak protection" aria-describedby="protection-detail">
-          <span class="power-icon" aria-hidden="true">
+        <div class="power-row">
+          <button class="power-control" id="master-toggle" type="button" role="switch" aria-checked="true" aria-label="Cloak protection" aria-describedby="protection-detail">
             <svg viewBox="0 0 32 32" focusable="false">
               <path d="M16 4v12" />
               <path d="M9.2 8.2a12 12 0 1 0 13.6 0" />
             </svg>
-          </span>
+          </button>
           <span class="power-copy">
             <strong id="power-label">Protection on</strong>
             <small id="protection-detail">Sensitive values are checked locally.</small>
           </span>
-          <span class="power-state" id="power-state">ON</span>
-        </button>
+        </div>
         <div class="home-status" id="site-status" data-active="false" role="status" aria-live="polite">
           <span class="status-light" aria-hidden="true"></span>
           <span class="status-copy">
@@ -79,6 +78,10 @@
           <span class="vault-count" id="vault-count">0</span>
         </div>
         <p class="page-description">Masked values are kept here so Cloak can restore your replies.</p>
+        <label class="vault-search">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m12.5 12.5 4 4"/></svg>
+          <input id="vault-search" type="search" placeholder="Find a token or value" autocomplete="off" spellcheck="false" aria-label="Search vault entries">
+        </label>
         <div class="vault-list" id="vault-list" aria-live="polite">
           <p class="empty-vault">Nothing masked yet. Your tokens will appear here.</p>
         </div>
