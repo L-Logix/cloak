@@ -10,7 +10,8 @@ const parseAddress = require('addressit');
     phones: true,
     addresses: true,
     restoreResponses: true,
-    showBadge: true
+    showBadge: true,
+    customTerms: []
   };
   const EMAIL_PATTERN = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
   const PHONE_PATTERN = /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g;
@@ -211,6 +212,17 @@ const parseAddress = require('addressit');
     function maskText(value) {
       if (!enabled || typeof value !== 'string') return value;
       let text = value;
+      const customTerms = Array.isArray(settings.customTerms)
+        ? [...new Set(settings.customTerms.filter((term) => typeof term === 'string').map((term) => term.trim()).filter((term) => term.length >= 2 && term.length <= 80))]
+          .sort((a, b) => b.length - a.length)
+        : [];
+      for (const term of customTerms) {
+        const expression = new RegExp(`(?<![\\p{L}\\p{N}_])${escapeRegExp(term)}(?![\\p{L}\\p{N}_])`, 'giu');
+        text = text.replace(expression, (match) => {
+          maskedCount += 1;
+          return register('CUSTOM', match);
+        });
+      }
       if (settings.names) {
         for (const span of findPersonSpans(text)) {
           maskedCount += 1;

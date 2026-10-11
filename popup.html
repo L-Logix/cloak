@@ -126,6 +126,25 @@
         <p class="settings-note"><span class="local-dot" aria-hidden="true"></span>Local patterns are useful, not perfect recognition.</p>
       </section>
 
+      <section class="page-view terms-view" data-page-view="terms" aria-labelledby="terms-heading" hidden>
+        <div class="page-title-row">
+          <div>
+            <p class="eyebrow">PERSONAL DICTIONARY</p>
+            <h1 id="terms-heading">Custom terms</h1>
+          </div>
+          <span class="terms-total" id="terms-total">0 saved</span>
+        </div>
+        <p class="page-description">Add names, project codenames, or phrases you want Cloak to replace in prompts.</p>
+        <form class="term-form" id="custom-term-form">
+          <label class="sr-only" for="custom-term-input">Term to mask</label>
+          <input id="custom-term-input" type="text" maxlength="80" autocomplete="off" placeholder="Add a private term">
+          <button type="submit" aria-label="Add custom term">Add</button>
+        </form>
+        <p class="term-feedback" id="term-feedback" aria-live="polite"></p>
+        <ul class="custom-term-list" id="custom-term-list" aria-label="Saved custom terms"></ul>
+        <p class="settings-note"><span class="local-dot" aria-hidden="true"></span>Terms stay in this browser.</p>
+      </section>
+
       <section class="page-view settings-view" data-page-view="settings" aria-labelledby="settings-heading" hidden>
         <div class="page-title-row">
           <div>
@@ -150,6 +169,10 @@
           <div><span class="site-dot" aria-hidden="true"></span>Gemini<span>SUPPORTED</span></div>
           <div><span class="site-dot" aria-hidden="true"></span>Claude<span>SUPPORTED</span></div>
         </div>
+        <div class="settings-action-row">
+          <span><strong>Activity totals</strong><small>Reset local dashboard counters</small></span>
+          <button id="reset-activity" class="text-action" type="button">Reset</button>
+        </div>
         <p class="settings-note"><span class="local-dot" aria-hidden="true"></span>Your vault stays in this browser.</p>
       </section>
     </div>
@@ -166,6 +189,10 @@
       <button class="nav-item" type="button" data-page-target="coverage">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 16 5v5c0 3.4-2.2 5.9-6 7.5C6.2 15.9 4 13.4 4 10V5z"/><path d="m7 10 2 2 4-4"/></svg>
         <span>Coverage</span>
+      </button>
+      <button class="nav-item" type="button" data-page-target="terms">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4.5h14v11H3z"/><path d="M6 8h8M6 11h5"/></svg>
+        <span>Terms</span>
       </button>
       <button class="nav-item" type="button" data-page-target="settings">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 2.8h4l.6 2a6 6 0 0 1 1.1.6l2-.6 2 3.4-1.5 1.6a6 6 0 0 1 0 1.3l1.5 1.6-2 3.4-2-.6a6 6 0 0 1-1.1.6l-.6 2H8l-.6-2a6 6 0 0 1-1.1-.6l-2 .6-2-3.4 1.5-1.6a6 6 0 0 1 0-1.3L2.3 8.2l2-3.4 2 .6a6 6 0 0 1 1.1-.6z" /><circle cx="10" cy="10.5" r="2.2" /></svg>

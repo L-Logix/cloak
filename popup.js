@@ -4,7 +4,8 @@ const DEFAULT_SETTINGS = {
   phones: true,
   addresses: true,
   restoreResponses: true,
-  showBadge: true
+  showBadge: true,
+  customTerms: []
 };
 const SUPPORTED_SITES = [
   { host: 'chatgpt.com', label: 'ChatGPT' },
@@ -28,6 +29,12 @@ const ui = {
   clearVault: document.getElementById('clear-vault'),
   vaultMessage: document.getElementById('vault-message'),
   coverageTotal: document.getElementById('coverage-total'),
+  customTermForm: document.getElementById('custom-term-form'),
+  customTermInput: document.getElementById('custom-term-input'),
+  customTermList: document.getElementById('custom-term-list'),
+  termsTotal: document.getElementById('terms-total'),
+  termFeedback: document.getElementById('term-feedback'),
+  resetActivity: document.getElementById('reset-activity'),
   settings: [...document.querySelectorAll('[data-setting]')],
   pages: [...document.querySelectorAll('[data-page-view]')],
   navigation: [...document.querySelectorAll('[data-page-target]')]
@@ -122,6 +129,15 @@ function supportedSite(url) {
 }
 
 function render() {
+  const protectionState = !state.enabled ? 'off' : state.site ? 'on' : 'idle';
+  const stateChanged = state.protectionState !== undefined && state.protectionState !== protectionState;
+  state.protectionState = protectionState;
+  document.body.dataset.protectionState = protectionState;
+  if (stateChanged && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    ui.masterToggle.classList.remove('state-change');
+    void ui.masterToggle.offsetWidth;
+    ui.masterToggle.classList.add('state-change');
+  }
   ui.masterToggle.setAttribute('aria-checked', String(state.enabled));
   ui.masterToggle.dataset.enabled = String(state.enabled);
   ui.powerLabel.textContent = state.enabled ? 'Cloak protection on' : 'Cloak protection paused';
@@ -130,21 +146,24 @@ function render() {
     ? 'Sensitive details are checked on this device.'
     : 'Paused. Prompts will pass through unmasked.';
 
-  const active = Boolean(state.site && state.enabled);
+  const active = protectionState === 'on';
   ui.siteStatus.dataset.active = String(active);
   ui.siteMark.textContent = state.site?.label === 'ChatGPT' ? 'GPT' : state.site?.label === 'Gemini' ? 'G' : state.site?.label === 'Claude' ? 'C' : 'AI';
-  if (!state.site) {
+  if (!state.enabled) {
+    ui.statusLabel.textContent = 'Protection off';
+    ui.statusCaption.textContent = 'Prompts pass through unmasked';
+  } else if (!state.site) {
     ui.statusLabel.textContent = 'Idle';
     ui.statusCaption.textContent = 'Unsupported site';
-  } else if (state.enabled) {
+  } else {
     ui.statusLabel.textContent = `Protecting ${state.site.label}`;
     ui.statusCaption.textContent = 'Protection is on';
-  } else {
-    ui.statusLabel.textContent = `${state.site.label} is unprotected`;
-    ui.statusCaption.textContent = 'Protection is off';
   }
 
   const entries = Object.entries(state.vault || {});
+  state.settings.customTerms = Array.isArray(state.settings.customTerms)
+    ? state.settings.customTerms.filter((term) => typeof term === 'string' && term.trim()).slice(0, 100)
+    : [];
   const query = state.vaultQuery.trim().toLocaleLowerCase();
   const visibleEntries = entries.filter(([token, original]) =>
     !query || token.toLocaleLowerCase().includes(query) || String(original).toLocaleLowerCase().includes(query)
@@ -194,6 +213,34 @@ function render() {
   for (const input of ui.settings) {
     input.checked = state.settings[input.dataset.setting] !== false;
   }
+  renderCustomTerms();
+}
+
+function renderCustomTerms() {
+  const terms = state.settings.customTerms;
+  ui.termsTotal.textContent = `${terms.length} saved`;
+  ui.customTermList.replaceChildren();
+  if (terms.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'custom-terms-empty';
+    empty.textContent = 'No custom terms yet.';
+    ui.customTermList.append(empty);
+    return;
+  }
+  for (const term of terms) {
+    const row = document.createElement('li');
+    row.className = 'custom-term-row';
+    const label = document.createElement('span');
+    label.textContent = term;
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'term-remove';
+    remove.dataset.removeTerm = term;
+    remove.setAttribute('aria-label', `Remove ${term}`);
+    remove.textContent = 'Remove';
+    row.append(label, remove);
+    ui.customTermList.append(row);
+  }
 }
 
 ui.navigation.forEach((button) => {
@@ -212,6 +259,43 @@ ui.vaultList.addEventListener('click', (event) => {
   if (state.revealedTokens.has(token)) state.revealedTokens.delete(token);
   else state.revealedTokens.add(token);
   render();
+});
+
+ui.customTermForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const term = ui.customTermInput.value.trim();
+  if (term.length < 2) {
+    ui.termFeedback.textContent = 'Enter at least two characters.';
+    return;
+  }
+  if (state.settings.customTerms.some((saved) => saved.toLocaleLowerCase() === term.toLocaleLowerCase())) {
+    ui.termFeedback.textContent = 'That term is already saved.';
+    return;
+  }
+  if (state.settings.customTerms.length >= 100) {
+    ui.termFeedback.textContent = 'Custom term limit reached.';
+    return;
+  }
+  state.settings.customTerms.push(term);
+  ui.customTermInput.value = '';
+  ui.termFeedback.textContent = 'Term saved on this device.';
+  render();
+  save({ settings: state.settings });
+});
+
+ui.customTermList.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-remove-term]');
+  if (!button) return;
+  state.settings.customTerms = state.settings.customTerms.filter((term) => term !== button.dataset.removeTerm);
+  ui.termFeedback.textContent = 'Term removed.';
+  render();
+  save({ settings: state.settings });
+});
+
+ui.resetActivity.addEventListener('click', () => {
+  state.stats = { requestsChecked: 0, valuesMasked: 0 };
+  render();
+  save({ stats: state.stats });
 });
 
 function save(changes) {

@@ -106,6 +106,22 @@ test('does not mask numbers that do not parse as street addresses', () => {
   assert.equal(masker.takePendingEntries().length, 0);
 });
 
+test('masks custom names and phrases without built-in entity rules', () => {
+  const masker = createMasker();
+  masker.configure({ enabled: true, settings: { customTerms: ['Project Juniper', 'Mara'] } });
+  const original = 'Send Project Juniper notes to Mara; mention Juniperish only if needed.';
+  const rewritten = masker.rewriteBody(JSON.stringify({ prompt: original }));
+  const prompt = JSON.parse(rewritten).prompt;
+  const entries = masker.takePendingEntries();
+
+  assert.match(prompt, /\[CUSTOM_1_[a-z0-9-]+\]/i);
+  assert.match(prompt, /\[CUSTOM_2_[a-z0-9-]+\]/i);
+  assert.match(prompt, /Juniperish/);
+  assert.equal(entries[0].original, 'Project Juniper');
+  assert.equal(entries[1].original, 'Mara');
+  assert.equal(masker.restoreText(prompt), original);
+});
+
 test('rewrites Gemini f.req form payloads containing nested JSON', () => {
   const masker = createMasker();
   const innerPayload = JSON.stringify([['Contact john@example.com']]);
