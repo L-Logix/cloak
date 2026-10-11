@@ -22,6 +22,7 @@
     let enabled = true;
     let nextIndex = 1;
     let sessionId = createSessionId();
+    let maskedCount = 0;
     const tokenToOriginal = new Map();
     const originalToToken = new Map();
     const pendingEntries = [];
@@ -46,14 +47,24 @@
           if (NAME_STOPWORDS.has(words[0].toLowerCase())) return match;
           const matchedName = words.join(' ');
           const trailingText = name.slice(matchedName.length);
+          maskedCount += 1;
           return `${prefix}${register('PERSON', matchedName)}${trailingText}`;
         };
         text = text.replace(TITLED_PERSON_PATTERN, maskName);
         text = text.replace(PERSON_PATTERN, maskName);
       }
-      if (settings.addresses) text = text.replace(ADDRESS_PATTERN, (address) => register('ADDRESS', address));
-      if (settings.emails) text = text.replace(EMAIL_PATTERN, (email) => register('EMAIL', email));
-      if (settings.phones) text = text.replace(PHONE_PATTERN, (phone) => register('PHONE', phone));
+      if (settings.addresses) text = text.replace(ADDRESS_PATTERN, (address) => {
+        maskedCount += 1;
+        return register('ADDRESS', address);
+      });
+      if (settings.emails) text = text.replace(EMAIL_PATTERN, (email) => {
+        maskedCount += 1;
+        return register('EMAIL', email);
+      });
+      if (settings.phones) text = text.replace(PHONE_PATTERN, (phone) => {
+        maskedCount += 1;
+        return register('PHONE', phone);
+      });
       return text;
     }
 
@@ -81,6 +92,7 @@
 
     function rewriteBody(body, contentType = '') {
       if (typeof body !== 'string') throw new TypeError('PromptMask requires a textual request body');
+      maskedCount = 0;
       if (/application\/x-www-form-urlencoded/i.test(contentType)) {
         const params = new URLSearchParams(body);
         for (const [key, value] of params.entries()) params.set(key, rewriteEmbeddedString(value));
@@ -115,6 +127,11 @@
       },
       hasMappings: () => tokenToOriginal.size > 0,
       shouldRestoreResponses: () => settings.restoreResponses !== false,
+      takeMaskedCount: () => {
+        const count = maskedCount;
+        maskedCount = 0;
+        return count;
+      },
       maskText,
       maxTokenLength: () => Math.max(0, ...[...tokenToOriginal.keys()].map((token) => token.length)),
       restoreText,
@@ -240,6 +257,12 @@
         `[Cloak] Intercepted outgoing AI request: ${method} ${new URL(url, root.location.href).pathname}; Content-Type: ${headers.get('content-type') || '(browser default)'}`
       );
       const rewrittenBody = masker.rewriteBody(body, headers.get('content-type') || '');
+      const maskedCount = masker.takeMaskedCount();
+      root.postMessage({
+        type: 'CLOAK_REQUEST_STATS',
+        requestsChecked: 1,
+        valuesMasked: maskedCount
+      }, root.location.origin);
       const entries = masker.takePendingEntries();
       if (entries.length) root.postMessage({ type: 'CLOAK_MASKED_DATA', entries }, root.location.origin);
       if (root.location.hostname === 'gemini.google.com') {

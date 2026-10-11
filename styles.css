@@ -261,19 +261,17 @@ body.popup-body {
 .page-view { width: 100%; min-height: 0; flex: 1; overflow: hidden; }
 .page-view[hidden] { display: none; }
 .eyebrow { margin: 0 0 9px; color: var(--green); font-size: 9px; font-weight: 800; letter-spacing: .08em; }
-.home-view { display: flex; flex-direction: column; align-items: center; padding: 4px 3px 8px; text-align: center; }
-.home-copy h1, .page-title-row h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 25px; font-weight: 600; line-height: 1.08; }
-.home-copy h1 span { color: var(--green); }
-.home-description { max-width: 270px; margin: 6px auto 0; color: var(--muted); font-size: 10px; }
+.home-view { display: flex; flex-direction: column; padding: 4px 2px 8px; }
+.page-title-row h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 25px; font-weight: 600; line-height: 1.08; }
 
 .home-status {
 	display: flex;
 	width: 100%;
-	min-height: 49px;
+	min-height: 45px;
 	align-items: center;
 	gap: 10px;
-	margin-top: auto;
-	padding: 8px 11px;
+	margin-top: 0;
+	padding: 7px 10px;
 	border: 1px solid var(--line);
 	border-radius: 9px;
 	background: var(--surface);
@@ -287,52 +285,56 @@ body.popup-body {
 .home-status[data-active="true"] .status-light { background: #54a96d; box-shadow: 0 0 0 4px rgb(84 169 109 / 13%); }
 
 .power-control {
-	display: flex;
+	display: grid;
 	width: 100%;
+	min-height: 58px;
 	flex: 0 0 auto;
-	flex-direction: column;
+	grid-template-columns: 38px minmax(0, 1fr) auto;
 	align-items: center;
-	justify-content: center;
-	gap: 4px;
-	padding: 2px 0 5px;
-	border: 0;
+	gap: 9px;
+	margin-bottom: 9px;
+	padding: 7px 9px;
+	border: 1px solid var(--line);
+	border-radius: 7px;
 	color: var(--ink);
-	background: transparent;
+	background: var(--surface);
+	text-align: left;
 	cursor: pointer;
+	transition: border-color 150ms ease, background-color 150ms ease;
 }
 .power-control:focus-visible, .nav-item:focus-visible, .clear-button:focus-visible, .setting-row input:focus-visible {
 	outline: 3px solid #78a9db;
 	outline-offset: 3px;
 }
-.power-ring {
-	position: relative;
-	display: grid;
-	width: 88px;
-	height: 88px;
-	place-items: center;
-	border: 1px solid #c9d8cc;
-	border-radius: 50%;
-	background: rgb(255 255 255 / 45%);
-	transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
-}
-.power-ring::before, .power-ring::after { position: absolute; inset: 6px; border: 1px solid rgb(42 118 92 / 13%); border-radius: 50%; content: ""; }
-.power-ring::after { inset: 13px; border-color: rgb(42 118 92 / 10%); }
-.power-ring svg { z-index: 1; width: 30px; height: 30px; fill: none; stroke: #4d725f; stroke-width: 1.7; stroke-linecap: round; transition: stroke 180ms ease, transform 180ms ease; }
-.power-control[data-enabled="true"] .power-ring {
-	transform: translateY(-2px);
-	border-color: var(--green);
-	background: #2f7659;
-	box-shadow: 0 0 0 8px rgb(42 118 92 / 9%), 0 12px 24px rgb(21 68 48 / 22%);
-}
-.power-control[data-enabled="true"] .power-ring::before { border-color: rgb(255 255 255 / 20%); }
-.power-control[data-enabled="true"] .power-ring::after { border-color: rgb(255 255 255 / 16%); }
-.power-control[data-enabled="true"] .power-ring svg { stroke: white; }
-.power-control[data-enabled="false"] .power-ring { border-color: #bec7c1; background: #e5eae6; box-shadow: none; }
-.power-control[data-enabled="false"] .power-ring::before, .power-control[data-enabled="false"] .power-ring::after { border-color: rgb(78 95 84 / 13%); }
-.power-label { font-size: 10px; font-weight: 850; }
-.power-hint { color: var(--muted); font-size: 9px; }
-.home-footnote { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 7px 0 0; color: var(--muted); font-size: 8px; }
-.home-footnote span { color: var(--green); font-size: 8px; }
+.power-icon { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); background: var(--paper); }
+.power-icon svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.power-copy { display: grid; min-width: 0; gap: 1px; }
+.power-copy strong { font-size: 11px; font-weight: 720; }
+.power-copy small { overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.power-state { min-width: 36px; padding: 4px 7px; border-radius: 4px; color: var(--muted); background: var(--paper); text-align: center; font-size: 9px; font-weight: 800; }
+.power-control[data-enabled="true"] .power-icon { border-color: #c5ddcc; color: #286c4a; background: #edf5ef; }
+.power-control[data-enabled="true"] .power-state { color: #286c4a; background: #edf5ef; }
+.power-control[data-enabled="false"] { border-color: #d8c9c7; }
+.power-control[data-enabled="false"] .power-icon { color: #8c4a45; background: #f8efee; }
+.power-control[data-enabled="false"] .power-state { color: #8c4a45; background: #f8efee; }
+
+.activity-section { margin-top: auto; padding-top: 20px; }
+.activity-heading { display: flex; align-items: end; justify-content: space-between; }
+.activity-heading .eyebrow { margin-bottom: 5px; }
+.activity-heading h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 22px; font-weight: 600; }
+.local-label { display: inline-flex; align-items: center; gap: 5px; padding-bottom: 3px; color: var(--muted); font-size: 8px; font-weight: 750; letter-spacing: .06em; }
+.local-label .local-dot { width: 5px; height: 5px; }
+.activity-metrics { display: grid; grid-template-columns: 1fr 1fr; margin-top: 13px; padding: 14px 0 12px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.activity-metric { min-width: 0; padding: 0 12px 0 2px; }
+.activity-metric + .activity-metric { padding: 0 0 0 14px; border-left: 1px solid var(--line); }
+.activity-metric > p { margin: 0 0 5px; color: var(--muted); font-size: 9px; font-weight: 650; }
+.activity-metric > small { display: block; margin-top: 4px; color: var(--muted); font-size: 8px; }
+.odometer { display: flex; min-height: 40px; align-items: center; color: var(--ink); font-family: Georgia, "Times New Roman", serif; font-size: 32px; font-variant-numeric: tabular-nums; line-height: 1; }
+.odometer-window { display: inline-block; height: 1em; overflow: hidden; }
+.odometer-reel { display: flex; flex-direction: column; transition: transform 620ms cubic-bezier(.2,.72,.22,1); }
+.odometer-reel > span { display: block; height: 1em; }
+.odometer-separator { align-self: center; }
+.activity-disclaimer { max-width: 300px; margin: 9px 0 0; color: var(--muted); font-size: 8px; }
 
 .vault-view, .coverage-view, .settings-view { padding: 17px 2px 8px; }
 .vault-view { display: flex; flex-direction: column; }
@@ -350,7 +352,7 @@ body.popup-body {
 .clear-button { min-height: 31px; }
 .vault-message { flex: 1; }
 
-.settings-gear { display: grid; width: 37px; height: 37px; place-items: center; border: 1px solid var(--line); border-radius: 11px; color: var(--green); background: var(--surface); font-size: 19px; }
+.page-meta { padding: 5px 7px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); font-size: 8px; font-weight: 750; }
 .settings-list { padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
 .setting-row { min-height: 48px; }
 .setting-row strong { font-size: 11px; }
@@ -409,9 +411,12 @@ body.popup-body {
 }
 
 @media (prefers-color-scheme: dark) {
-	.power-ring { border-color: #53675a; background: rgb(255 255 255 / 3%); }
-	.power-ring svg { stroke: #a4c6ad; }
-	.power-control[data-enabled="true"] .power-ring { background: #2f7659; }
-	.power-control[data-enabled="false"] .power-ring { border-color: #58635c; background: #29312c; }
+	.power-icon { border-color: #3d4a41; color: #a0b0a4; background: #29312c; }
+	.power-control[data-enabled="true"] .power-icon, .power-control[data-enabled="true"] .power-state { border-color: #425747; color: #9bd0a9; background: #29382e; }
+	.power-control[data-enabled="false"] .power-icon, .power-control[data-enabled="false"] .power-state { color: #e3a6a0; background: #392c2b; }
 	.settings-list { background: #202823; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.odometer-reel { transition: none; }
 }

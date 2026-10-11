@@ -18,6 +18,29 @@
   let banner;
   let bannerTimeout;
   let refreshQueued = false;
+  let statsWriteQueue = Promise.resolve();
+
+  function recordRequestStats(message) {
+    const requestsChecked = Number.isSafeInteger(message.requestsChecked) ? Math.max(0, message.requestsChecked) : 0;
+    const valuesMasked = Number.isSafeInteger(message.valuesMasked) ? Math.max(0, message.valuesMasked) : 0;
+    if (!requestsChecked) return;
+
+    statsWriteQueue = statsWriteQueue.then(() => new Promise((resolve) => {
+      chrome.storage.local.get({ stats: { requestsChecked: 0, valuesMasked: 0 } }, (result) => {
+        if (chrome.runtime.lastError) {
+          resolve();
+          return;
+        }
+        const stats = result.stats || { requestsChecked: 0, valuesMasked: 0 };
+        chrome.storage.local.set({
+          stats: {
+            requestsChecked: (stats.requestsChecked || 0) + requestsChecked,
+            valuesMasked: (stats.valuesMasked || 0) + valuesMasked
+          }
+        }, resolve);
+      });
+    })).catch((error) => console.warn('[Cloak] Could not update local activity totals:', error));
+  }
 
   function publishConfig() {
     window.postMessage({
@@ -138,6 +161,8 @@
       });
     } else if (event.data.type === 'CLOAK_MEDIA_BYPASS') {
       showMediaBanner();
+    } else if (event.data.type === 'CLOAK_REQUEST_STATS') {
+      recordRequestStats(event.data);
     }
   });
 

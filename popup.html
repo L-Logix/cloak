@@ -25,20 +25,18 @@
     <div class="page-stage">
       <section class="page-view home-view" data-page-view="home" aria-labelledby="home-heading">
         <button class="power-control" id="master-toggle" type="button" role="switch" aria-checked="true" aria-label="Cloak protection" aria-describedby="protection-detail">
-          <span class="power-ring" aria-hidden="true">
+          <span class="power-icon" aria-hidden="true">
             <svg viewBox="0 0 32 32" focusable="false">
               <path d="M16 4v12" />
               <path d="M9.2 8.2a12 12 0 1 0 13.6 0" />
             </svg>
           </span>
-          <span class="power-label" id="power-label">CLOAK ON</span>
-          <span class="power-hint">Tap to pause protection</span>
+          <span class="power-copy">
+            <strong id="power-label">Protection on</strong>
+            <small id="protection-detail">Sensitive values are checked locally.</small>
+          </span>
+          <span class="power-state" id="power-state">ON</span>
         </button>
-        <div class="home-copy">
-          <p class="eyebrow">YOUR PRIVATE AI LAYER</p>
-          <h1 id="home-heading">Your words.<br><span>Your control.</span></h1>
-          <p class="home-description" id="protection-detail">Checking protection status...</p>
-        </div>
         <div class="home-status" id="site-status" data-active="false" role="status" aria-live="polite">
           <span class="status-light" aria-hidden="true"></span>
           <span class="status-copy">
@@ -47,7 +45,29 @@
           </span>
           <span class="site-mark" id="site-mark" aria-hidden="true">AI</span>
         </div>
-        <p class="home-footnote"><span aria-hidden="true">◆</span> Pattern detection can miss details. Review before sending.</p>
+
+        <section class="activity-section" aria-labelledby="home-heading">
+          <div class="activity-heading">
+            <div>
+              <p class="eyebrow">THIS BROWSER</p>
+              <h1 id="home-heading">Privacy activity</h1>
+            </div>
+            <span class="local-label"><span class="local-dot" aria-hidden="true"></span>LOCAL</span>
+          </div>
+          <div class="activity-metrics">
+            <div class="activity-metric">
+              <p>Values masked</p>
+              <div class="odometer" id="values-masked" aria-label="0">0</div>
+              <small>Details replaced before send</small>
+            </div>
+            <div class="activity-metric">
+              <p>Requests checked</p>
+              <div class="odometer" id="requests-checked" aria-label="0">0</div>
+              <small>Supported chat submissions</small>
+            </div>
+          </div>
+          <p class="activity-disclaimer">Pattern detection can miss details. Review prompts before sending.</p>
+        </section>
       </section>
 
       <section class="page-view vault-view" data-page-view="vault" aria-labelledby="vault-heading" hidden>
@@ -109,7 +129,7 @@
             <p class="eyebrow">PERSONAL PREFERENCES</p>
             <h1 id="settings-heading">Settings</h1>
           </div>
-          <span class="settings-gear" aria-hidden="true">⚙</span>
+          <span class="page-meta">LOCAL</span>
         </div>
         <div class="settings-list preference-list">
           <label class="setting-row" for="setting-restore">

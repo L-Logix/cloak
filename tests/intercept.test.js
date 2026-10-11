@@ -21,6 +21,17 @@ test('masks names, emails, and phone numbers and restores them', () => {
   assert.deepEqual(masker.takePendingEntries().map(({ original }) => original), [
     'John Doe', 'john@example.com', '415-555-0137'
   ]);
+  assert.equal(masker.takeMaskedCount(), 3);
+});
+
+test('counts each masked occurrence even when the original already has a token', () => {
+  const masker = createMasker();
+  masker.rewriteBody(JSON.stringify({ prompt: 'Email alex@example.test.' }));
+  assert.equal(masker.takeMaskedCount(), 1);
+  assert.equal(masker.takePendingEntries().length, 1);
+  masker.rewriteBody(JSON.stringify({ prompt: 'Email alex@example.test again.' }));
+  assert.equal(masker.takePendingEntries().length, 0);
+  assert.equal(masker.takeMaskedCount(), 1);
 });
 
 test('masks lowercase name in the reported ChatGPT prompt without consuming following words', () => {
@@ -182,6 +193,7 @@ test('fetch wrapper masks the real Gemini payload before sending and restores it
 
 test('fetch wrapper masks ChatGPT unauth-mweb conversation updates requests', async () => {
   const listeners = new Map();
+  const messages = [];
   let transmittedBody;
   const pageWindow = {
     location: {
@@ -193,7 +205,7 @@ test('fetch wrapper masks ChatGPT unauth-mweb conversation updates requests', as
     TransformStream,
     console: { info() {} },
     addEventListener: (type, listener) => listeners.set(type, listener),
-    postMessage() {},
+    postMessage(message) { messages.push(message); },
     fetch: async (_input, init) => {
       transmittedBody = JSON.parse(init.body);
       return new Response(JSON.stringify({ ok: true }), {
@@ -235,6 +247,9 @@ test('fetch wrapper masks ChatGPT unauth-mweb conversation updates requests', as
   assert.match(transmittedBody.prompt, /\[PHONE_2_chat-tes\]/);
   assert.equal(transmittedBody.prompt.includes('bob'), false);
   assert.equal(transmittedBody.prompt.includes('919-123-4567'), false);
+  const statsMessage = messages.find(({ type }) => type === 'CLOAK_REQUEST_STATS');
+  assert.equal(statsMessage.requestsChecked, 1);
+  assert.equal(statsMessage.valuesMasked, 2);
 });
 
 test('preserves the inferred form content type when rewriting URLSearchParams', async () => {

@@ -15,11 +15,14 @@ const SUPPORTED_SITES = [
 const ui = {
   masterToggle: document.getElementById('master-toggle'),
   powerLabel: document.getElementById('power-label'),
+  powerState: document.getElementById('power-state'),
   protectionDetail: document.getElementById('protection-detail'),
   siteStatus: document.getElementById('site-status'),
   statusLabel: document.getElementById('status-label'),
   statusCaption: document.getElementById('status-caption'),
   siteMark: document.getElementById('site-mark'),
+  valuesMasked: document.getElementById('values-masked'),
+  requestsChecked: document.getElementById('requests-checked'),
   vaultCount: document.getElementById('vault-count'),
   vaultList: document.getElementById('vault-list'),
   clearVault: document.getElementById('clear-vault'),
@@ -34,6 +37,7 @@ let state = {
   enabled: true,
   settings: { ...DEFAULT_SETTINGS },
   vault: {},
+  stats: { requestsChecked: 0, valuesMasked: 0 },
   site: null
 };
 let messageTimeout;
@@ -48,6 +52,61 @@ function showPage(pageName) {
     if (active) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   }
+  const targetPage = ui.pages.find((page) => page.dataset.pageView === pageName);
+  if (targetPage && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    targetPage.animate(
+      [{ opacity: 0, transform: 'translateY(5px)' }, { opacity: 1, transform: 'translateY(0)' }],
+      { duration: 180, easing: 'cubic-bezier(.2,.7,.2,1)' }
+    );
+  }
+}
+
+function renderOdometer(element, value) {
+  const number = Number.isSafeInteger(value) && value >= 0 ? value : 0;
+  const formatted = new Intl.NumberFormat('en-US').format(number);
+  element.setAttribute('aria-label', formatted);
+  const layout = formatted.replace(/\d/g, '0');
+  if (element.dataset.layout === layout) {
+    const reels = [...element.querySelectorAll('.odometer-reel')];
+    let index = 0;
+    for (const character of formatted) {
+      if (!/\d/.test(character)) continue;
+      reels[index++].style.transform = `translateY(-${character}em)`;
+    }
+    return;
+  }
+
+  element.replaceChildren();
+  element.dataset.layout = layout;
+  for (const character of formatted) {
+    if (!/\d/.test(character)) {
+      const separator = document.createElement('span');
+      separator.className = 'odometer-separator';
+      separator.textContent = character;
+      element.append(separator);
+      continue;
+    }
+    const windowElement = document.createElement('span');
+    windowElement.className = 'odometer-window';
+    windowElement.setAttribute('aria-hidden', 'true');
+    const reel = document.createElement('span');
+    reel.className = 'odometer-reel';
+    for (let digit = 0; digit <= 9; digit += 1) {
+      const cell = document.createElement('span');
+      cell.textContent = String(digit);
+      reel.append(cell);
+    }
+    windowElement.append(reel);
+    element.append(windowElement);
+  }
+  requestAnimationFrame(() => {
+    const reels = [...element.querySelectorAll('.odometer-reel')];
+    let index = 0;
+    for (const character of formatted) {
+      if (!/\d/.test(character)) continue;
+      reels[index++].style.transform = `translateY(-${character}em)`;
+    }
+  });
 }
 
 function supportedSite(url) {
@@ -62,11 +121,12 @@ function supportedSite(url) {
 function render() {
   ui.masterToggle.setAttribute('aria-checked', String(state.enabled));
   ui.masterToggle.dataset.enabled = String(state.enabled);
-  ui.powerLabel.textContent = state.enabled ? 'CLOAK ON' : 'CLOAK OFF';
+  ui.powerLabel.textContent = state.enabled ? 'Cloak protection on' : 'Cloak protection paused';
+  ui.powerState.textContent = state.enabled ? 'ON' : 'OFF';
   ui.masterToggle.setAttribute('aria-label', state.enabled ? 'Turn Cloak protection off' : 'Turn Cloak protection on');
   ui.protectionDetail.textContent = state.enabled
-    ? 'Sensitive details are masked before they leave this device.'
-    : 'Cloak is paused. Prompts will pass through unmasked.';
+    ? 'Sensitive details are checked on this device.'
+    : 'Paused. Prompts will pass through unmasked.';
 
   const active = Boolean(state.site && state.enabled);
   ui.siteStatus.dataset.active = String(active);
@@ -88,6 +148,8 @@ function render() {
   ui.vaultCount.textContent = String(entries.length);
   ui.clearVault.disabled = entries.length === 0;
   ui.vaultList.replaceChildren();
+  renderOdometer(ui.valuesMasked, state.stats.valuesMasked);
+  renderOdometer(ui.requestsChecked, state.stats.requestsChecked);
 
   if (entries.length === 0) {
     const empty = document.createElement('p');
@@ -165,7 +227,7 @@ function initialize() {
     return;
   }
 
-  chrome.storage.local.get(['enabled', 'settings', 'vault'], (result) => {
+  chrome.storage.local.get(['enabled', 'settings', 'vault', 'stats'], (result) => {
     if (chrome.runtime.lastError) {
       ui.statusLabel.textContent = 'Unable to read vault';
       ui.statusCaption.textContent = 'Check extension storage access';
@@ -174,6 +236,7 @@ function initialize() {
     state.enabled = result.enabled !== false;
     state.settings = { ...DEFAULT_SETTINGS, ...(result.settings || {}) };
     state.vault = result.vault || {};
+    state.stats = result.stats || { requestsChecked: 0, valuesMasked: 0 };
     render();
   });
 
@@ -187,6 +250,7 @@ function initialize() {
     if (changes.enabled) state.enabled = changes.enabled.newValue !== false;
     if (changes.settings) state.settings = { ...DEFAULT_SETTINGS, ...(changes.settings.newValue || {}) };
     if (changes.vault) state.vault = changes.vault.newValue || {};
+    if (changes.stats) state.stats = changes.stats.newValue || { requestsChecked: 0, valuesMasked: 0 };
     render();
   });
 }
