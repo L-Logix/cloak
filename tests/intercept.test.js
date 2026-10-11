@@ -35,6 +35,21 @@ test('masks lowercase name in the reported ChatGPT prompt without consuming foll
   assert.equal(masker.restoreText(masked), original);
 });
 
+test('masks a name after a title and a US street address in the reported prompt', () => {
+  const masker = createMasker();
+  const original = 'write an email to principal chadwick at 123 reedy creek ln saying i need my psat test scores back at alex@example.test';
+  const masked = masker.maskText(original);
+  const entries = masker.takePendingEntries();
+
+  assert.match(masked, /principal \[PERSON_1_[a-z0-9-]+\] at \[ADDRESS_2_[a-z0-9-]+\].*\[EMAIL_3_[a-z0-9-]+\]/i);
+  assert.equal(masked.includes('chadwick'), false);
+  assert.equal(masked.includes('123 reedy creek ln'), false);
+  assert.deepEqual(entries.map(({ original: value }) => value), [
+    'chadwick', '123 reedy creek ln', 'alex@example.test'
+  ]);
+  assert.equal(masker.restoreText(masked), original);
+});
+
 test('rewrites Gemini f.req form payloads containing nested JSON', () => {
   const masker = createMasker();
   const innerPayload = JSON.stringify([['Contact john@example.com']]);
@@ -83,10 +98,17 @@ test('detects media generation requests for the unmasked fallback', () => {
 
 test('respects per-category settings', () => {
   const masker = createMasker();
-  masker.configure({ enabled: true, settings: { names: false, emails: true, phones: false } });
-  const masked = masker.rewriteBody(JSON.stringify({ text: 'My name is John Doe, email john@example.com, phone 415-555-0137' }));
+  masker.configure({ enabled: true, settings: { names: false, emails: true, phones: false, addresses: false } });
+  const masked = masker.rewriteBody(JSON.stringify({ text: 'My name is John Doe, email john@example.com, phone 415-555-0137, address 123 Reedy Creek Ln' }));
 
-  assert.match(JSON.parse(masked).text, /^My name is John Doe, email \[EMAIL_1_[a-z0-9-]+\], phone 415-555-0137$/i);
+  assert.match(JSON.parse(masked).text, /^My name is John Doe, email \[EMAIL_1_[a-z0-9-]+\], phone 415-555-0137, address 123 Reedy Creek Ln$/i);
+});
+
+test('response restoration preference is configurable', () => {
+  const masker = createMasker();
+  assert.equal(masker.shouldRestoreResponses(), true);
+  masker.configure({ enabled: true, settings: { restoreResponses: false } });
+  assert.equal(masker.shouldRestoreResponses(), false);
 });
 
 test('detects media intent in URL-encoded request bodies', () => {

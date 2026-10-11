@@ -1,9 +1,16 @@
 (() => {
   'use strict';
 
-  const DEFAULT_SETTINGS = { names: true, emails: true, phones: true };
+  const DEFAULT_SETTINGS = {
+    names: true,
+    emails: true,
+    phones: true,
+    addresses: true,
+    restoreResponses: true,
+    showBadge: true
+  };
   const mediaIntent = /\b(?:draw|generate|create|make)\s+(?:me\s+)?(?:an?\s+)?(?:image|picture|photo|illustration|video)\b|\bimage generation\b/i;
-  const piiHint = /[A-Z][a-z]+\s+[A-Z][a-z]+|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/;
+  const piiHint = /[A-Z][a-z]+\s+[A-Z][a-z]+|\b(?:principal|professor|doctor|dr\.?|mr\.?|mrs\.?|ms\.?|miss|coach|teacher)\s+[a-z]+|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|\b\d{1,6}\s+(?:[a-z0-9]+\s+){1,5}(?:street|st\.?|avenue|ave\.?|road|rd\.?|boulevard|blvd\.?|lane|ln\.?|drive|dr\.?|court|ct\.?|circle|cir\.?|way|parkway|pkwy\.?|terrace|ter\.?|place|pl\.?|trail|trl\.?)\b|\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/i;
 
   let config = { enabled: true, settings: { ...DEFAULT_SETTINGS } };
   let currentComposer;
@@ -58,6 +65,10 @@
   }
 
   function createBadge() {
+    if (config.settings.showBadge === false) {
+      badge?.remove();
+      return;
+    }
     if (!badge) {
       badge = document.createElement('span');
       badge.className = 'cloak-mask-badge';
@@ -93,6 +104,7 @@
     refreshQueued = false;
     const found = findComposer();
     if (found === currentComposer) {
+      createBadge();
       positionElements();
       return;
     }
@@ -118,7 +130,7 @@
         if (chrome.runtime.lastError) return;
         const vault = { ...(result.vault || {}) };
         for (const entry of event.data.entries) {
-          if (!entry || !/^\[(PERSON|EMAIL|PHONE)_\d+_[a-z0-9-]+\]$/i.test(entry.token)) continue;
+          if (!entry || !/^\[(PERSON|ADDRESS|EMAIL|PHONE)_\d+_[a-z0-9-]+\]$/i.test(entry.token)) continue;
           if (typeof entry.original !== 'string' || entry.original.length > 500) continue;
           vault[entry.token] = entry.original;
         }
@@ -146,6 +158,7 @@
       window.postMessage({ type: 'CLOAK_CLEAR_MEMORY' }, location.origin);
     }
     publishConfig();
+    queueRefresh();
     if (currentComposer) onComposerInput({ currentTarget: currentComposer });
   });
 

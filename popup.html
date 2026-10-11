@@ -24,6 +24,16 @@
 
     <div class="page-stage">
       <section class="page-view home-view" data-page-view="home" aria-labelledby="home-heading">
+        <button class="power-control" id="master-toggle" type="button" role="switch" aria-checked="true" aria-label="Cloak protection" aria-describedby="protection-detail">
+          <span class="power-ring" aria-hidden="true">
+            <svg viewBox="0 0 32 32" focusable="false">
+              <path d="M16 4v12" />
+              <path d="M9.2 8.2a12 12 0 1 0 13.6 0" />
+            </svg>
+          </span>
+          <span class="power-label" id="power-label">CLOAK ON</span>
+          <span class="power-hint">Tap to pause protection</span>
+        </button>
         <div class="home-copy">
           <p class="eyebrow">YOUR PRIVATE AI LAYER</p>
           <h1 id="home-heading">Your words.<br><span>Your control.</span></h1>
@@ -35,19 +45,9 @@
             <strong id="status-label">Checking site</strong>
             <small id="status-caption">One moment</small>
           </span>
-          <span class="site-mark" aria-hidden="true">AI</span>
+          <span class="site-mark" id="site-mark" aria-hidden="true">AI</span>
         </div>
-        <button class="power-control" id="master-toggle" type="button" role="switch" aria-checked="true" aria-label="Cloak protection" aria-describedby="protection-detail">
-          <span class="power-ring" aria-hidden="true">
-            <svg viewBox="0 0 32 32" focusable="false">
-              <path d="M16 4v12" />
-              <path d="M9.2 8.2a12 12 0 1 0 13.6 0" />
-            </svg>
-          </span>
-          <span class="power-label" id="power-label">CLOAK ON</span>
-          <span class="power-hint">Tap to pause protection</span>
-        </button>
-        <p class="home-footnote"><span aria-hidden="true">◆</span> Your private details stay on this device</p>
+        <p class="home-footnote"><span aria-hidden="true">◆</span> Pattern detection can miss details. Review before sending.</p>
       </section>
 
       <section class="page-view vault-view" data-page-view="vault" aria-labelledby="vault-heading" hidden>
@@ -73,18 +73,18 @@
         </div>
       </section>
 
-      <section class="page-view settings-view" data-page-view="settings" aria-labelledby="settings-heading" hidden>
+      <section class="page-view coverage-view" data-page-view="coverage" aria-labelledby="coverage-heading" hidden>
         <div class="page-title-row">
           <div>
-            <p class="eyebrow">MAKE IT YOURS</p>
-            <h1 id="settings-heading">Settings</h1>
+            <p class="eyebrow">DETECTION CATEGORIES</p>
+            <h1 id="coverage-heading">Coverage</h1>
           </div>
-          <span class="settings-gear" aria-hidden="true">⚙</span>
+          <span class="coverage-total" id="coverage-total">4 active</span>
         </div>
-        <p class="page-description">Choose which details Cloak should keep private.</p>
-        <div class="settings-list">
+        <p class="page-description">Choose the patterns Cloak checks before a prompt leaves your device.</p>
+        <div class="settings-list coverage-list">
           <label class="setting-row" for="setting-names">
-            <span><strong>Names</strong><small>Introduced names and people</small></span>
+            <span><strong>Names</strong><small>Introductions and titles</small></span>
             <input id="setting-names" type="checkbox" data-setting="names" checked>
           </label>
           <label class="setting-row" for="setting-emails">
@@ -95,8 +95,39 @@
             <span><strong>Phone numbers</strong><small>Common US number formats</small></span>
             <input id="setting-phones" type="checkbox" data-setting="phones" checked>
           </label>
+          <label class="setting-row" for="setting-addresses">
+            <span><strong>Street addresses</strong><small>Common US street formats</small></span>
+            <input id="setting-addresses" type="checkbox" data-setting="addresses" checked>
+          </label>
         </div>
-        <p class="settings-note"><span class="local-dot" aria-hidden="true"></span>Detection and restoration happen locally.</p>
+        <p class="settings-note"><span class="local-dot" aria-hidden="true"></span>Local patterns are useful, not perfect recognition.</p>
+      </section>
+
+      <section class="page-view settings-view" data-page-view="settings" aria-labelledby="settings-heading" hidden>
+        <div class="page-title-row">
+          <div>
+            <p class="eyebrow">PERSONAL PREFERENCES</p>
+            <h1 id="settings-heading">Settings</h1>
+          </div>
+          <span class="settings-gear" aria-hidden="true">⚙</span>
+        </div>
+        <div class="settings-list preference-list">
+          <label class="setting-row" for="setting-restore">
+            <span><strong>Restore replies</strong><small>Replace Cloak tokens with originals</small></span>
+            <input id="setting-restore" type="checkbox" data-setting="restoreResponses" checked>
+          </label>
+          <label class="setting-row" for="setting-badge">
+            <span><strong>Composer badge</strong><small>Show Cloak status by the chat box</small></span>
+            <input id="setting-badge" type="checkbox" data-setting="showBadge" checked>
+          </label>
+        </div>
+        <div class="supported-sites">
+          <p class="eyebrow">SUPPORTED CHATS</p>
+          <div><span class="site-dot" aria-hidden="true"></span>ChatGPT<span>SUPPORTED</span></div>
+          <div><span class="site-dot" aria-hidden="true"></span>Gemini<span>SUPPORTED</span></div>
+          <div><span class="site-dot" aria-hidden="true"></span>Claude<span>SUPPORTED</span></div>
+        </div>
+        <p class="settings-note"><span class="local-dot" aria-hidden="true"></span>Your vault stays in this browser.</p>
       </section>
     </div>
 
@@ -108,6 +139,10 @@
       <button class="nav-item" type="button" data-page-target="vault">
         <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="5" width="14" height="12" rx="2" /><path d="M6 5V4a4 4 0 0 1 8 0v1m-4 5v3" /></svg>
         <span>Vault</span>
+      </button>
+      <button class="nav-item" type="button" data-page-target="coverage">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 16 5v5c0 3.4-2.2 5.9-6 7.5C6.2 15.9 4 13.4 4 10V5z"/><path d="m7 10 2 2 4-4"/></svg>
+        <span>Coverage</span>
       </button>
       <button class="nav-item" type="button" data-page-target="settings">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 2.8h4l.6 2a6 6 0 0 1 1.1.6l2-.6 2 3.4-1.5 1.6a6 6 0 0 1 0 1.3l1.5 1.6-2 3.4-2-.6a6 6 0 0 1-1.1.6l-.6 2H8l-.6-2a6 6 0 0 1-1.1-.6l-2 .6-2-3.4 1.5-1.6a6 6 0 0 1 0-1.3L2.3 8.2l2-3.4 2 .6a6 6 0 0 1 1.1-.6z" /><circle cx="10" cy="10.5" r="2.2" /></svg>

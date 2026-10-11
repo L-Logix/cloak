@@ -1,10 +1,19 @@
 (function (root) {
   'use strict';
 
-  const DEFAULT_SETTINGS = { names: true, emails: true, phones: true };
+  const DEFAULT_SETTINGS = {
+    names: true,
+    emails: true,
+    phones: true,
+    addresses: true,
+    restoreResponses: true,
+    showBadge: true
+  };
   const EMAIL_PATTERN = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
   const PHONE_PATTERN = /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g;
   const PERSON_PATTERN = /\b((?:my name is|i am|i'm|this is)\s+)([a-zA-Z]+(?:[-'][a-zA-Z]+)?(?:\s+[a-zA-Z]+(?:[-'][a-zA-Z]+)?)?)/gi;
+  const TITLED_PERSON_PATTERN = /\b((?:principal|professor|doctor|dr\.?|mr\.?|mrs\.?|ms\.?|miss|coach|teacher)\s+)([a-z]+(?:[-'][a-z]+)?(?:\s+[a-z]+(?:[-'][a-z]+)?)?)/gi;
+  const ADDRESS_PATTERN = /\b\d{1,6}\s+(?:(?:north|south|east|west|n\.?|s\.?|e\.?|w\.?)\s+)?(?:[a-z0-9]+(?:['-][a-z0-9]+)?\s+){0,5}(?:street|st\.?|avenue|ave\.?|road|rd\.?|boulevard|blvd\.?|lane|ln\.?|drive|dr\.?|court|ct\.?|circle|cir\.?|way|parkway|pkwy\.?|terrace|ter\.?|place|pl\.?|trail|trl\.?)\b\.?(?:,?\s+[a-z]{2}\s+\d{5}(?:-\d{4})?)?/gi;
   const NAME_STOPWORDS = new Set(['a', 'an', 'and', 'at', 'email', 'for', 'in', 'my', 'number', 'of', 'on', 'or', 'phone', 'the', 'to', 'with']);
   const MEDIA_PATTERN = /\b(?:draw|generate|create|make)\s+(?:me\s+)?(?:an?\s+)?(?:image|picture|photo|illustration|video)\b|\bimage generation\b/i;
 
@@ -31,15 +40,18 @@
       if (!enabled || typeof value !== 'string') return value;
       let text = value;
       if (settings.names) {
-        text = text.replace(PERSON_PATTERN, (match, prefix, name) => {
+        const maskName = (match, prefix, name) => {
           const words = name.split(/\s+/);
           while (words.length > 1 && NAME_STOPWORDS.has(words.at(-1).toLowerCase())) words.pop();
           if (NAME_STOPWORDS.has(words[0].toLowerCase())) return match;
           const matchedName = words.join(' ');
           const trailingText = name.slice(matchedName.length);
           return `${prefix}${register('PERSON', matchedName)}${trailingText}`;
-        });
+        };
+        text = text.replace(TITLED_PERSON_PATTERN, maskName);
+        text = text.replace(PERSON_PATTERN, maskName);
       }
+      if (settings.addresses) text = text.replace(ADDRESS_PATTERN, (address) => register('ADDRESS', address));
       if (settings.emails) text = text.replace(EMAIL_PATTERN, (email) => register('EMAIL', email));
       if (settings.phones) text = text.replace(PHONE_PATTERN, (phone) => register('PHONE', phone));
       return text;
@@ -102,6 +114,7 @@
         sessionId = createSessionId();
       },
       hasMappings: () => tokenToOriginal.size > 0,
+      shouldRestoreResponses: () => settings.restoreResponses !== false,
       maskText,
       maxTokenLength: () => Math.max(0, ...[...tokenToOriginal.keys()].map((token) => token.length)),
       restoreText,
@@ -246,7 +259,7 @@
       if (root.location.hostname === 'gemini.google.com') {
         root.console?.info(`[PromptMask] Gemini server responded with HTTP ${response.status}.`);
       }
-      if (!masker.hasMappings() || !response.body || [204, 205, 304].includes(response.status)) return response;
+      if (!masker.hasMappings() || !masker.shouldRestoreResponses() || !response.body || [204, 205, 304].includes(response.status)) return response;
       if (!/(?:text|json|javascript|protobuf|x-ndjson)/i.test(response.headers.get('content-type') || '')) return response;
 
       try {

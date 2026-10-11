@@ -1,4 +1,11 @@
-const DEFAULT_SETTINGS = { names: true, emails: true, phones: true };
+const DEFAULT_SETTINGS = {
+  names: true,
+  emails: true,
+  phones: true,
+  addresses: true,
+  restoreResponses: true,
+  showBadge: true
+};
 const SUPPORTED_SITES = [
   { host: 'chatgpt.com', label: 'ChatGPT' },
   { host: 'gemini.google.com', label: 'Gemini' },
@@ -12,10 +19,12 @@ const ui = {
   siteStatus: document.getElementById('site-status'),
   statusLabel: document.getElementById('status-label'),
   statusCaption: document.getElementById('status-caption'),
+  siteMark: document.getElementById('site-mark'),
   vaultCount: document.getElementById('vault-count'),
   vaultList: document.getElementById('vault-list'),
   clearVault: document.getElementById('clear-vault'),
   vaultMessage: document.getElementById('vault-message'),
+  coverageTotal: document.getElementById('coverage-total'),
   settings: [...document.querySelectorAll('[data-setting]')],
   pages: [...document.querySelectorAll('[data-page-view]')],
   navigation: [...document.querySelectorAll('[data-page-target]')]
@@ -61,6 +70,7 @@ function render() {
 
   const active = Boolean(state.site && state.enabled);
   ui.siteStatus.dataset.active = String(active);
+  ui.siteMark.textContent = state.site?.label === 'ChatGPT' ? 'GPT' : state.site?.label === 'Gemini' ? 'G' : state.site?.label === 'Claude' ? 'C' : 'AI';
   if (!state.site) {
     ui.statusLabel.textContent = 'Idle';
     ui.statusCaption.textContent = 'Unsupported site';
@@ -73,6 +83,8 @@ function render() {
   }
 
   const entries = Object.entries(state.vault || {});
+  const categories = ['names', 'emails', 'phones', 'addresses'];
+  ui.coverageTotal.textContent = `${categories.filter((category) => state.settings[category] !== false).length} active`;
   ui.vaultCount.textContent = String(entries.length);
   ui.clearVault.disabled = entries.length === 0;
   ui.vaultList.replaceChildren();
