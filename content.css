@@ -1,20 +1,41 @@
+/* ---------------------------------------------------------------------------
+   Cloak — injected page styles (content.css)
+
+   These two elements are appended to the chat page itself (never the popup):
+
+     .cloak-mask-badge     a small lock pinned to the composer's corner
+     .cloak-media-banner   a toast explaining why image prompts skip masking
+
+   Both are position:fixed at the very top of the stacking context
+   (z-index ~2^31) so site styles cannot bury them, and both are
+   pointer-events:none so they never intercept a click meant for the site.
+   Colours are hard-coded (not tokens) because this stylesheet runs in the
+   page's origin, where our design tokens do not exist.
+--------------------------------------------------------------------------- */
+
+/* ---------- composer badge ---------- */
+
 .cloak-mask-badge {
   position: fixed;
-  z-index: 2147483646;
+  z-index: 2147483646; /* one below the banner */
   display: inline-grid;
   width: 25px;
   height: 25px;
   place-items: center;
+  /* Muted sage palette chosen to sit quietly inside both light and dark
+     chat themes; opacity .82 keeps it from shouting. */
   border: 1px solid #aab4ad;
   border-radius: 50%;
   color: #61716a;
   background: #fff;
   box-shadow: 0 2px 8px rgb(16 35 25 / 12%);
   opacity: .82;
-  pointer-events: none;
+  pointer-events: none; /* decorative only — clicks pass through to the site */
   transition: color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 
+/* Active = the current draft looks like it contains PII (see piiHint in
+   content.js). The badge turns blue and gains a soft halo. */
 .cloak-mask-badge[data-active="true"] {
   border-color: #6aabdb;
   color: #2879b8;
@@ -31,13 +52,18 @@
   stroke-linejoin: round;
 }
 
+/* ---------- media-bypass banner ---------- */
+
 .cloak-media-banner {
   position: fixed;
-  z-index: 2147483647;
+  z-index: 2147483647; /* topmost Cloak element */
   bottom: 86px;
   width: min(420px, calc(100vw - 32px));
   padding: 12px 15px;
+  /* Starts 12px low and transparent; the [data-visible] rule slides it in. */
   transform: translate(-50%, 12px);
+  /* Warm parchment palette: informational, not alarming — Cloak is choosing
+     to skip masking for image prompts, and says so. */
   border: 1px solid #e3d8aa;
   border-radius: 7px;
   color: #3e3a28;
@@ -54,12 +80,16 @@
   opacity: 1;
 }
 
+/* ---------- dark theme ---------- */
+/* Chat sites flip to dark at night; invert both elements to match. */
 @media (prefers-color-scheme: dark) {
   .cloak-mask-badge { border-color: #63716a; color: #c0cbc3; background: #222b25; }
   .cloak-mask-badge[data-active="true"] { border-color: #70b6e8; color: #86c8f4; }
   .cloak-media-banner { border-color: #645c3c; color: #f0e9cc; background: #302d20; }
 }
 
+/* ---------- reduced motion ---------- */
+/* Slide/fade still works; it simply happens instantly. */
 @media (prefers-reduced-motion: reduce) {
   .cloak-mask-badge, .cloak-media-banner { transition-duration: .01ms; }
 }
