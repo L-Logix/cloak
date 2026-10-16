@@ -42,6 +42,25 @@
   let refreshQueued = false;      // coalesce DOM-mutation refresh bursts
   let statsWriteQueue = Promise.resolve(); // serialize counter read-modify-writes
 
+  // ---- extension-context liveness ------------------------------------------
+  // When the extension is reloaded or updated while this tab stays open,
+  // Chrome invalidates this content script's context: the script keeps
+  // running, but every chrome.* call throws "Extension context invalidated".
+  // Masking itself is unaffected (the interceptor is plain MAIN-world page
+  // JS and survives), so instead of warning on every request we detect the
+  // invalidation once, go dormant, and leave storage alone for good.
+  let contextValid = true;
+
+  function markContextInvalid() {
+    contextValid = false;
+  }
+
+  // Only the specific invalidation error flips the flag; other storage errors
+  // (quota, corrupted data) are transient and must not shut the bridge down.
+  function isContextInvalidated(error) {
+    return /Extension context invalidated/i.test(String((error && error.message) || error));
+  }
+
   // Collapse duplicate vault entries that map to the same value. Older versions
   // minted a fresh token for the same value on every page load, so a vault could
   // fill with many tokens that all restore to e.g. "bob". Keep one token per
@@ -68,26 +87,45 @@
   // Fold one CLOAK_REQUEST_STATS message into the stored counters. Stats
   // updates are queued (not fired straight away) because several requests can
   // report in the same tick and a plain read-modify-write would lose counts.
+  // Every chrome.* touch is guarded so an invalidated context goes quiet
+  // instead of throwing once per request.
   function recordRequestStats(message) {
+    if (!contextValid) return;
     const requestsChecked = Number.isSafeInteger(message.requestsChecked) ? Math.max(0, message.requestsChecked) : 0;
     const valuesMasked = Number.isSafeInteger(message.valuesMasked) ? Math.max(0, message.valuesMasked) : 0;
     if (!requestsChecked) return;
 
     statsWriteQueue = statsWriteQueue.then(() => new Promise((resolve) => {
-      chrome.storage.local.get({ stats: { requestsChecked: 0, valuesMasked: 0 } }, (result) => {
-        if (chrome.runtime.lastError) {
-          resolve();
-          return;
-        }
-        const stats = result.stats || { requestsChecked: 0, valuesMasked: 0 };
-        chrome.storage.local.set({
-          stats: {
-            requestsChecked: (stats.requestsChecked || 0) + requestsChecked,
-            valuesMasked: (stats.valuesMasked || 0) + valuesMasked
+      if (!contextValid) {
+        resolve();
+        return;
+      }
+      try {
+        chrome.storage.local.get({ stats: { requestsChecked: 0, valuesMasked: 0 } }, (result) => {
+          if (!contextValid || chrome.runtime.lastError) {
+            resolve();
+            return;
           }
-        }, resolve);
-      });
-    })).catch((error) => console.warn('[Cloak] Could not update local activity totals:', error));
+          const stats = result.stats || { requestsChecked: 0, valuesMasked: 0 };
+          try {
+            chrome.storage.local.set({
+              stats: {
+                requestsChecked: (stats.requestsChecked || 0) + requestsChecked,
+                valuesMasked: (stats.valuesMasked || 0) + valuesMasked
+              }
+            }, resolve);
+          } catch (error) {
+            if (isContextInvalidated(error)) markContextInvalid();
+            resolve();
+          }
+        });
+      } catch (error) {
+        // chrome.storage.local.get throws synchronously once the context is
+        // dead — latch the flag and drop this update.
+        if (isContextInvalidated(error)) markContextInvalid();
+        resolve();
+      }
+    })).catch(() => {});
   }
 
   // Push the current enabled/settings pair to the interceptor. Targeted at our
@@ -216,23 +254,34 @@
 
   // ---- interceptor → storage bridge ---------------------------------------
   // Accepts vault entries, media bypass notices, and stats from the MAIN
-  // world. Origin + source checks stop any other frame from injecting data.
+  // world. Origin + source checks stop any other frame from injecting data;
+  // once the extension context dies we ignore messages entirely (the
+  // interceptor keeps masking — only this storage bridge goes dormant).
   window.addEventListener('message', (event) => {
+    if (!contextValid) return;
     if (event.source !== window || !event.data || event.origin !== location.origin) return;
     if (event.data.type === 'CLOAK_MASKED_DATA' && Array.isArray(event.data.entries)) {
-      chrome.storage.local.get({ vault: {} }, (result) => {
-        if (chrome.runtime.lastError) return;
-        const vault = { ...(result.vault || {}) };
-        for (const entry of event.data.entries) {
-          // Strict shape checks: only well-formed tokens and short strings are
-          // persisted, so a hostile page cannot flood extension storage.
-          if (!entry || !/^\[(PERSON|ADDRESS|EMAIL|PHONE|CUSTOM)_\d+_[a-z0-9-]+\]$/i.test(entry.token)) continue;
-          if (typeof entry.original !== 'string' || entry.original.length > 500) continue;
-          vault[entry.token] = entry.original;
-        }
-        // Dedupe on every write so old duplicate vaults keep shrinking.
-        chrome.storage.local.set({ vault: dedupeVault(vault) });
-      });
+      try {
+        chrome.storage.local.get({ vault: {} }, (result) => {
+          if (!contextValid || chrome.runtime.lastError) return;
+          const vault = { ...(result.vault || {}) };
+          for (const entry of event.data.entries) {
+            // Strict shape checks: only well-formed tokens and short strings
+            // are persisted, so a hostile page cannot flood extension storage.
+            if (!entry || !/^\[(PERSON|ADDRESS|EMAIL|PHONE|CUSTOM)_\d+_[a-z0-9-]+\]$/i.test(entry.token)) continue;
+            if (typeof entry.original !== 'string' || entry.original.length > 500) continue;
+            vault[entry.token] = entry.original;
+          }
+          // Dedupe on every write so old duplicate vaults keep shrinking.
+          try {
+            chrome.storage.local.set({ vault: dedupeVault(vault) });
+          } catch (error) {
+            if (isContextInvalidated(error)) markContextInvalid();
+          }
+        });
+      } catch (error) {
+        if (isContextInvalidated(error)) markContextInvalid();
+      }
     } else if (event.data.type === 'CLOAK_MEDIA_BYPASS') {
       showMediaBanner();
     } else if (event.data.type === 'CLOAK_REQUEST_STATS') {
@@ -242,25 +291,39 @@
 
   // One-time cleanup so vaults already polluted by older versions collapse
   // without waiting for the next masked send.
-  chrome.storage.local.get({ vault: {} }, (result) => {
-    if (chrome.runtime.lastError) return;
-    const original = result.vault || {};
-    const cleaned = dedupeVault(original);
-    if (Object.keys(cleaned).length !== Object.keys(original).length) {
-      chrome.storage.local.set({ vault: cleaned });
-    }
-  });
+  try {
+    chrome.storage.local.get({ vault: {} }, (result) => {
+      if (!contextValid || chrome.runtime.lastError) return;
+      const original = result.vault || {};
+      const cleaned = dedupeVault(original);
+      if (Object.keys(cleaned).length !== Object.keys(original).length) {
+        try {
+          chrome.storage.local.set({ vault: cleaned });
+        } catch (error) {
+          if (isContextInvalidated(error)) markContextInvalid();
+        }
+      }
+    });
+  } catch (error) {
+    if (isContextInvalidated(error)) markContextInvalid();
+  }
 
   // Initial configuration read; publish once so the interceptor is never
   // left guessing before the first request.
-  chrome.storage.local.get(['enabled', 'settings'], (result) => {
-    if (!chrome.runtime.lastError) {
-      config.enabled = result.enabled !== false;
-      config.settings = { ...DEFAULT_SETTINGS, ...(result.settings || {}) };
-    }
+  try {
+    chrome.storage.local.get(['enabled', 'settings'], (result) => {
+      if (contextValid && !chrome.runtime.lastError) {
+        config.enabled = result.enabled !== false;
+        config.settings = { ...DEFAULT_SETTINGS, ...(result.settings || {}) };
+      }
+      publishConfig();
+      queueRefresh();
+    });
+  } catch (error) {
+    if (isContextInvalidated(error)) markContextInvalid();
     publishConfig();
     queueRefresh();
-  });
+  }
 
   // Live updates: the popup writes storage, we republish and re-render.
   chrome.storage.onChanged.addListener((changes, areaName) => {

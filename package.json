@@ -6,7 +6,7 @@
   "scripts": {
     "build:interceptor": "esbuild intercept.js --bundle --minify --platform=browser --format=iife --target=chrome111 --outfile=intercept.bundle.js",
     "pretest": "npm run build:interceptor",
-    "test": "node --test tests/intercept.test.js"
+    "test": "node --test \"tests/*.test.js\""
   },
   "dependencies": {
     "addressit": "^1.8.2",
