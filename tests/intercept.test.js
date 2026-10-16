@@ -511,6 +511,183 @@ test('XMLHttpRequest masks Gemini StreamGenerate f.req and restores response get
   assert.equal(messages.some(({ type }) => type === 'CLOAK_MASKED_DATA'), true);
 });
 
+// Shared scaffolding for the XHR streaming tests: the same fake page window
+// as the single-read XHR test above, except the mock reply starts EMPTY so a
+// test can grow _responseText across simulated progress events — exactly how
+// Gemini's StreamGenerate delivers a reply (the page reads responseText after
+// every chunk and tracks how much of it it has consumed).
+function makeStreamingXHRPage() {
+  const listeners = new Map();
+  const messages = [];
+  class MockXHR {
+    constructor() {
+      this.headers = {};
+      this.responseType = '';
+      this.status = 200;
+      this.readyState = 2; // LOADING — the transfer is still open
+      this._responseText = '';
+    }
+    open(method, url) {
+      this.method = method;
+      this.url = url;
+    }
+    setRequestHeader(name, value) {
+      this.headers[name.toLowerCase()] = value;
+    }
+    send(body) {
+      this.sentBody = body;
+      const params = new URLSearchParams(body);
+      const outer = JSON.parse(params.get('f.req'));
+      const prompt = JSON.parse(outer[1])[0][0];
+      // Tokens as they went out on the wire (the masked reply echoes them).
+      this.mintedTokens = prompt.match(/\[(?:PERSON|PHONE|EMAIL)_[^\]]+\]/g) || [];
+      this._responseText = ''; // reply has not arrived yet
+    }
+  }
+  // Platform XHR defines these getters up the prototype chain; mirror that so
+  // the interceptor's findDescriptor walk has something to find.
+  Object.defineProperty(MockXHR.prototype, 'responseText', {
+    configurable: true,
+    get() { return this._responseText; }
+  });
+  Object.defineProperty(MockXHR.prototype, 'response', {
+    configurable: true,
+    get() { return this._responseText; }
+  });
+
+  const pageWindow = {
+    location: {
+      href: 'https://gemini.google.com/app',
+      origin: 'https://gemini.google.com',
+      hostname: 'gemini.google.com'
+    },
+    XMLHttpRequest: MockXHR,
+    URL,
+    URLSearchParams,
+    Headers,
+    Request,
+    Response,
+    TransformStream,
+    console: { info() {}, warn() {} },
+    addEventListener: (type, listener) => listeners.set(type, listener),
+    postMessage: (message) => messages.push(message),
+    fetch: async () => new Response('ok')
+  };
+  const source = fs.readFileSync(require.resolve('../intercept.bundle.js'), 'utf8');
+  vm.runInNewContext(source, {
+    require,
+    window: pageWindow,
+    URL,
+    URLSearchParams,
+    Headers,
+    Request,
+    Response,
+    TransformStream,
+    TextEncoder,
+    TextDecoder
+  });
+  listeners.get('message')({
+    source: pageWindow,
+    origin: pageWindow.location.origin,
+    data: { type: 'CLOAK_CONFIG', enabled: true, settings: {} }
+  });
+
+  // Open a StreamGenerate request with the given prompt already sent.
+  const startGenerate = (prompt) => {
+    const nested = JSON.stringify([[prompt, 0, null, null, null, null, 0], ['en']]);
+    const xhr = new pageWindow.XMLHttpRequest();
+    xhr.open('POST', 'https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate');
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded;charset=UTF-8');
+    xhr.send(new URLSearchParams({ 'f.req': JSON.stringify([null, nested]) }));
+    const tokens = xhr.mintedTokens;
+    return {
+      xhr,
+      personToken: tokens.find((token) => token.startsWith('[PERSON')) || '',
+      emailToken: tokens.find((token) => token.startsWith('[EMAIL')) || ''
+    };
+  };
+  return { pageWindow, messages, startGenerate };
+}
+
+// THE Gemini stall regression. Gemini reads responseText after every progress
+// event and tracks its offset into it. The old getter restored the ENTIRE
+// accumulated text on every read — restoring a token shrinks the string, so
+// text the page had already consumed changed under its feet, the frame parser
+// desynced, and generation froze mid-sentence with the stop button stuck.
+// Restoration must be APPEND-ONLY: each read is a prefix of the next.
+test('XHR responseText restoration is append-only across progress events', () => {
+  const { startGenerate } = makeStreamingXHRPage();
+  const { xhr, personToken, emailToken } = startGenerate('my name is bob. my email is alex@example.test');
+  assert.ok(personToken && emailToken, 'prompt must mint both tokens');
+
+  const snapshots = [];
+  const read = () => {
+    const text = xhr.responseText;
+    snapshots.push(text);
+    return text;
+  };
+
+  // Progress 1: the reply stops mid-token — the network split [PERSON_1…].
+  xhr._responseText = `Sure, I will email ${personToken.slice(0, 9)}`;
+  assert.equal(read(), 'Sure, I will email '); // partial token held back, not leaked
+
+  // Progress 2: that token completes; a second one starts splitting.
+  xhr._responseText = `Sure, I will email ${personToken} now (${emailToken.slice(0, 7)}`;
+  const second = read();
+  assert.match(second, /bob/); // already restored for the page to render...
+  assert.equal(second.startsWith('Sure, I will email '), true); // ...without rewriting the prefix
+  assert.equal(second.includes('['), false); // no raw token fragment delivered
+
+  // Progress 3: the transfer finishes — everything flushes.
+  xhr.readyState = 4;
+  xhr._responseText = `Sure, I will email ${personToken} now (${emailToken}). Done!`;
+  const final = read();
+
+  // The regression guard: every read must start with the previous read.
+  // The old getter returned `…email [PERSON_1` first and then the SHRUNKEN
+  // `…email bob…`, which silently skipped characters for an offset-tracking
+  // consumer — that is the desync that froze Gemini's stream.
+  for (let i = 1; i < snapshots.length; i += 1) {
+    assert.equal(
+      snapshots[i].startsWith(snapshots[i - 1]),
+      true,
+      `read ${i} changed already-delivered text: ${JSON.stringify(snapshots[i - 1])} -> ${JSON.stringify(snapshots[i])}`
+    );
+  }
+  assert.equal(final, 'Sure, I will email bob now (alex@example.test). Done!');
+  assert.equal(final.includes('['), false);
+});
+
+// The hold-back tail must not eat the end of the reply: readyState 4 means no
+// more bytes can arrive, so even text that still LOOKS like a token prefix is
+// delivered (otherwise the last characters of a reply could vanish).
+test('XHR holds a token-shaped tail only until the transfer finishes', () => {
+  const { startGenerate } = makeStreamingXHRPage();
+  const { xhr, personToken } = startGenerate('my name is bob');
+
+  // While the transfer is open, a bracket that could grow into a token waits.
+  xhr._responseText = `The name is ${personToken.slice(0, 8)}`;
+  assert.equal(xhr.responseText, 'The name is ');
+
+  // DONE: flush the held tail verbatim.
+  xhr.readyState = 4;
+  assert.equal(xhr.responseText, `The name is ${personToken.slice(0, 8)}`);
+});
+
+// restoreText caches its longest-first ordering (streaming readers call it
+// per network chunk). Minting a new token must invalidate that cache or later
+// restores would miss the new mapping.
+test('restoreText picks up tokens minted after the cache warmed', () => {
+  const masker = createMasker();
+  const first = masker.maskText('My name is John Doe.');
+  assert.match(masker.restoreText(first), /John Doe/); // warms the sorted cache
+  const second = masker.maskText('Email me at alex@example.test.'); // new token
+  const restored = masker.restoreText(`${first} ${second}`);
+  assert.match(restored, /John Doe/);
+  assert.match(restored, /alex@example\.test/);
+  assert.equal(restored.includes('['), false);
+});
+
 // ChatGPT's unauthenticated mobile-web endpoint is a second real-world shape:
 // plain JSON body, plus the stats/vault messages the content script consumes.
 test('fetch wrapper masks ChatGPT unauth-mweb conversation updates requests', async () => {

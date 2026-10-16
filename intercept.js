@@ -289,6 +289,7 @@ const parseAddress = require('addressit'); // local street-address parser
     const originalToToken = new Map(); // dedupe direction: value → token
     const suffixIndex = new Map();     // hash suffix → display index ([PERSON_1_…])
     const pendingEntries = [];         // new vault rows waiting to be reported
+    let sortedTokens = null;           // cached restore order (see restoreText)
 
     // Mint (or reuse) the token for a value. Reuse is what stops the vault
     // from growing: "bob" typed on ten pages is still one vault row.
@@ -305,6 +306,7 @@ const parseAddress = require('addressit'); // local street-address parser
       const token = `[${category}_${index}_${suffix}]`;
       tokenToOriginal.set(token, original);
       originalToToken.set(original, token);
+      sortedTokens = null; // restore order changed
       pendingEntries.push({ token, original }); // new → vault
       return token;
     }
@@ -395,11 +397,14 @@ const parseAddress = require('addressit'); // local street-address parser
     }
 
     // Swap tokens back to their originals. Longest tokens first so a token
-    // that contains another token's text can never be clobbered early.
+    // that contains another token's text can never be clobbered early. The
+    // order is cached: streaming readers call this once per network chunk,
+    // and re-sorting the whole vault every time is measurable jank.
     function restoreText(value) {
+      sortedTokens ??= [...tokenToOriginal.keys()].sort((a, b) => b.length - a.length);
       let text = value;
-      for (const [token, original] of [...tokenToOriginal].sort((a, b) => b[0].length - a[0].length)) {
-        text = text.split(token).join(original);
+      for (const token of sortedTokens) {
+        text = text.split(token).join(tokenToOriginal.get(token));
       }
       return text;
     }
@@ -424,6 +429,7 @@ const parseAddress = require('addressit'); // local street-address parser
       clear() {
         tokenToOriginal.clear();
         originalToToken.clear();
+        sortedTokens = null;
         pendingEntries.length = 0;
       },
       hasMappings: () => tokenToOriginal.size > 0,
@@ -738,7 +744,53 @@ const parseAddress = require('addressit'); // local street-address parser
         if (entries.length) root.postMessage({ type: 'CLOAK_MASKED_DATA', entries }, root.location.origin);
 
         // Wrap this instance's response getters so the page never sees tokens.
+        //
+        // STREAMING SAFETY: Gemini reads responseText after every progress
+        // event and tracks how much text it has already consumed. Restoring
+        // a token SHRINKS the text (token → original value), so restoring
+        // over already-delivered text shifts every offset the page has
+        // recorded — its frame parser desyncs, the completion frame is never
+        // consumed, and the UI freezes mid-sentence with the stop button up.
+        // So restoration here is APPEND-ONLY: we hand out a growing prefix
+        // that NEVER changes retroactively, holding back any tail that could
+        // still turn into a token, and flush the held tail at readyState 4
+        // (DONE) when no more bytes can arrive.
         const responseType = this.responseType || '';
+        const streamed = { delivered: '', restored: '' };
+        // Characters from here to the end might be the start of a token
+        // ("[PERSON_1" split across progress events) — same rule as
+        // restoreStream: only an incomplete prefix of a real token holds.
+        const holdBackLength = (raw) => {
+          const tokens = masker.tokens();
+          if (!tokens.length) return raw.length;
+          const maxLength = masker.maxTokenLength();
+          const searchFrom = Math.max(0, raw.length - maxLength);
+          let safeLength = raw.length;
+          for (let index = searchFrom; index < raw.length; index += 1) {
+            if (raw.charCodeAt(index) !== 91) continue; // '['
+            const tail = raw.slice(index);
+            if (tokens.some((token) => token.length > tail.length && token.startsWith(tail))) {
+              safeLength = index;
+              break;
+            }
+          }
+          return safeLength;
+        };
+        const restoredSoFar = (raw) => {
+          if (!raw.startsWith(streamed.delivered)) {
+            // Defensive: a different payload than the one we were restoring
+            // (should not happen on a single XHR) — restart cleanly.
+            streamed.delivered = '';
+            streamed.restored = '';
+          }
+          const transferFinished = this.readyState === 4;
+          const safeLength = transferFinished ? raw.length : holdBackLength(raw);
+          if (safeLength > streamed.delivered.length) {
+            streamed.restored += masker.restoreText(raw.slice(streamed.delivered.length, safeLength));
+            streamed.delivered = raw.slice(0, safeLength);
+          }
+          return streamed.restored;
+        };
         const addRestoredGetter = (property, descriptor) => {
           if (!descriptor?.get) return;
           try {
@@ -747,7 +799,13 @@ const parseAddress = require('addressit'); // local street-address parser
               enumerable: descriptor.enumerable,
               get() {
                 const result = descriptor.get.call(this);
-                return masker.restoreValue(result);
+                if (typeof result !== 'string') return masker.restoreValue(result);
+                try {
+                  return restoredSoFar(result);
+                } catch {
+                  // Never break the page over restoration.
+                  return masker.restoreValue(result);
+                }
               }
             });
           } catch {
