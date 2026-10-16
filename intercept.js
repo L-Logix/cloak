@@ -56,6 +56,10 @@ const parseAddress = require('addressit'); // local street-address parser
   // so those requests bypass masking entirely — see containsMediaIntent().
   const MEDIA_PATTERN = /\b(?:draw|generate|create|make)\s+(?:me\s+)?(?:an?\s+)?(?:image|picture|photo|illustration|video)\b|\bimage generation\b/i;
 
+  // Gemini's processSession writes one form field per protobuf part:
+  // count=2&ofs=0&req0___data__=<base64>&req1___data__=<base64>.
+  const GEMINI_RPC_FORM_PATTERN = /^count=\d+&ofs=\d+&req\d+___data__=/;
+
   // ---- Small helpers ------------------------------------------------------
 
   // Make a literal safe to embed in a RegExp (".", "(" etc. must stay literal).
@@ -378,11 +382,29 @@ const parseAddress = require('addressit'); // local street-address parser
       return value;
     }
 
-    // Entry point for outgoing bodies. Handles the two wire formats the three
-    // supported providers actually use: form-encoded and JSON.
+    // Entry point for outgoing bodies. Handles the wire formats the three
+    // supported providers actually use: form-encoded and JSON — plus
+    // Gemini's processSession shape (base64 protobuf form parts), which is
+    // detected by body pattern because Google sometimes omits Content-Type.
     function rewriteBody(body, contentType = '') {
       if (typeof body !== 'string') throw new TypeError('PromptMask requires a textual request body');
       maskedCount = 0; // each rewrite starts a fresh count for the stats message
+      if (GEMINI_RPC_FORM_PATTERN.test(body)) {
+        const params = new URLSearchParams(body);
+        for (const key of [...new Set(params.keys())]) {
+          if (!/^req\d+___data__$/.test(key)) continue;
+          const original = params.get(key);
+          let bytes;
+          try {
+            bytes = decodeBase64Flexible(original);
+          } catch {
+            continue; // not base64 — leave the part alone
+          }
+          const mapped = mapProtobufProse(bytes, (text) => maskText(text));
+          if (mapped.changed) params.set(key, encodeBase64Flexible(mapped.bytes, isUrlSafeBase64(original)));
+        }
+        return params.toString();
+      }
       if (/application\/x-www-form-urlencoded/i.test(contentType)) {
         const params = new URLSearchParams(body);
         for (const [key, value] of params.entries()) params.set(key, rewriteEmbeddedString(value));
@@ -481,8 +503,10 @@ const parseAddress = require('addressit'); // local street-address parser
       /^\/backend-api\/(?:conversation|f\/conversation)(?:\/|$)/.test(pathname)
       || pathname === '/unauth-mweb/conversation/updates'
     )) return true;
-    // Gemini: the BardChatUi StreamGenerate endpoint.
+    // Gemini: the BardChatUi StreamGenerate endpoint, plus the newer
+    // processSession transport (base64 protobuf form parts).
     if (hostname === 'gemini.google.com' && /^\/_\/BardChatUi\/data\//.test(pathname)) return true;
+    if (hostname === 'geminiweb-pa.clients6.google.com' && pathname === '/v1/processSession') return true;
     // Claude: streaming completion + message-append endpoints.
     if ((hostname === 'claude.ai' || hostname.endsWith('.claude.ai')) && /^\/api\/.*\/(?:completion|append_message)$/.test(pathname)) return true;
     return false;
@@ -534,6 +558,204 @@ const parseAddress = require('addressit'); // local street-address parser
         onComplete();
       }
     }));
+  }
+
+  // ---- minimal protobuf codec (Gemini's processSession transport) --------
+  // Gemini's current endpoint (geminiweb-pa.clients6.google.com/v1/
+  // processSession) carries the user message as a prose string field inside
+  // a base64 protobuf form field, and streams replies as length-prefixed
+  // RPC frames whose JSON nests the same base64 protobufs. Masking and
+  // restoration therefore need to walk protobuf without a schema: every
+  // length-delimited field that decodes as prose is offered to a mapper;
+  // anything malformed or binary is copied byte-for-byte, so unknown fields
+  // and nonstandard fragments (the session blob has one) survive untouched.
+
+  function readVarint(bytes, offset) {
+    let value = 0;
+    let shift = 0;
+    let cursor = offset;
+    while (cursor < bytes.length) {
+      const byte = bytes[cursor];
+      cursor += 1;
+      value += (byte & 0x7f) * (2 ** shift);
+      if (byte < 0x80) return { value, next: cursor };
+      shift += 7;
+      if (shift > 35) return null; // absurdly long — treat as malformed
+    }
+    return null;
+  }
+
+  function appendVarint(out, value) {
+    let remaining = value;
+    do {
+      let byte = remaining % 128;
+      remaining = Math.floor(remaining / 128);
+      if (remaining > 0) byte += 128;
+      out.push(byte);
+    } while (remaining > 0);
+  }
+
+  // Strict parse: returns the field list, or null if ANY byte is not a
+  // well-formed field (unknown wire type, truncated length, overrun).
+  function parseProtobuf(bytes) {
+    const fields = [];
+    let offset = 0;
+    while (offset < bytes.length) {
+      const tag = readVarint(bytes, offset);
+      if (!tag) return null;
+      offset = tag.next;
+      const field = Math.floor(tag.value / 8);
+      const wireType = tag.value % 8;
+      if (field === 0) return null;
+      if (wireType === 0) {
+        const varint = readVarint(bytes, offset);
+        if (!varint) return null;
+        offset = varint.next;
+        fields.push({ field, wireType, varint: varint.value });
+      } else if (wireType === 1) {
+        if (offset + 8 > bytes.length) return null;
+        fields.push({ field, wireType, raw: bytes.slice(offset, offset + 8) });
+        offset += 8;
+      } else if (wireType === 2) {
+        const length = readVarint(bytes, offset);
+        if (!length) return null;
+        offset = length.next;
+        if (offset + length.value > bytes.length) return null;
+        fields.push({ field, wireType, bytes: bytes.slice(offset, offset + length.value) });
+        offset += length.value;
+      } else if (wireType === 5) {
+        if (offset + 4 > bytes.length) return null;
+        fields.push({ field, wireType, raw: bytes.slice(offset, offset + 4) });
+        offset += 4;
+      } else {
+        return null; // group start/end or reserved — nonstandard, bail out
+      }
+    }
+    return fields;
+  }
+
+  function serializeProtobuf(fields) {
+    const out = [];
+    for (const entry of fields) {
+      appendVarint(out, entry.field * 8 + entry.wireType);
+      if (entry.wireType === 0) {
+        appendVarint(out, entry.varint);
+      } else if (entry.wireType === 2) {
+        appendVarint(out, entry.bytes.length);
+        for (const byte of entry.bytes) out.push(byte);
+      } else {
+        for (const byte of entry.raw) out.push(byte);
+      }
+    }
+    return Uint8Array.from(out);
+  }
+
+  const protoTextDecoder = new TextDecoder('utf-8', { fatal: true });
+  const protoTextEncoder = new TextEncoder();
+
+  // Prose test: real user text contains whitespace; session GUIDs, hex ids,
+  // and the opaque auth blob never do, so they are skipped (and therefore
+  // can never be corrupted by a false-positive PII match).
+  const looksLikeProse = (text) => /\s/.test(text);
+
+  // Map every prose string field through mapText, recursing into cleanly
+  // parsed submessages. Returns { bytes, changed }; on any malformed field
+  // the whole original buffer is returned untouched.
+  function mapProtobufProse(bytes, mapText) {
+    const fields = parseProtobuf(bytes);
+    if (!fields) return { bytes, changed: false };
+    let changed = false;
+    const out = [];
+    for (const entry of fields) {
+      if (entry.wireType !== 2) {
+        out.push(entry);
+        continue;
+      }
+      let text = null;
+      try {
+        text = protoTextDecoder.decode(entry.bytes);
+      } catch {
+        text = null; // not valid UTF-8 — binary, leave it alone
+      }
+      if (text !== null && looksLikeProse(text)) {
+        const mapped = mapText(text);
+        if (mapped !== text) {
+          changed = true;
+          out.push({ field: entry.field, wireType: 2, bytes: protoTextEncoder.encode(mapped) });
+        } else {
+          out.push(entry);
+        }
+      } else {
+        const nested = mapProtobufProse(entry.bytes, mapText);
+        if (nested.changed) {
+          changed = true;
+          out.push({ field: entry.field, wireType: 2, bytes: nested.bytes });
+        } else {
+          out.push(entry); // nested parse failed or nothing matched — verbatim
+        }
+      }
+    }
+    return changed ? { bytes: serializeProtobuf(out), changed: true } : { bytes, changed: false };
+  }
+
+  // base64 with automatic standard/url-safe alphabet detection (Gemini's
+  // RPC bodies use both across fields).
+  function decodeBase64Flexible(text) {
+    const urlSafe = /[-_]/.test(text) && !/[+/]/.test(text);
+    const normalized = urlSafe ? text.replace(/-/g, '+').replace(/_/g, '/') : text;
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+    const binary = atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    return bytes;
+  }
+
+  function encodeBase64Flexible(bytes, urlSafe) {
+    let binary = '';
+    for (let index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]);
+    const standard = btoa(binary);
+    return urlSafe ? standard.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') : standard;
+  }
+
+  const isUrlSafeBase64 = (text) => /[-_]/.test(text) && !/[+/]/.test(text);
+
+  // One complete RPC frame ("<byte-length>\n<json>"): parse the JSON, offer
+  // every plausible base64 field to the protobuf prose mapper (restore
+  // direction), and re-emit the frame with a corrected length prefix so the
+  // page's chunk parser stays in sync with the restored bytes.
+  function restoreRpcChunk(lengthText, frameText, restoreProse) {
+    let payload;
+    try {
+      payload = JSON.parse(frameText);
+    } catch {
+      return `${lengthText}\n${frameText}`;
+    }
+    let changed = false;
+    const visit = (value) => {
+      if (typeof value === 'string') {
+        if (value.length < 24 || !/^[A-Za-z0-9+/_=-]+$/.test(value)) return value;
+        let bytes;
+        try {
+          bytes = decodeBase64Flexible(value);
+        } catch {
+          return value;
+        }
+        const mapped = mapProtobufProse(bytes, restoreProse);
+        if (!mapped.changed) return value;
+        changed = true;
+        return encodeBase64Flexible(mapped.bytes, isUrlSafeBase64(value));
+      }
+      if (Array.isArray(value)) return value.map(visit);
+      if (value && typeof value === 'object') {
+        for (const key of Object.keys(value)) value[key] = visit(value[key]);
+        return value;
+      }
+      return value;
+    };
+    const restored = visit(payload);
+    if (!changed) return `${lengthText}\n${frameText}`;
+    const json = JSON.stringify(restored);
+    return `${protoTextEncoder.encode(json).length}\n${json}`;
   }
 
   // ---- Page wiring --------------------------------------------------------
@@ -710,10 +932,153 @@ const parseAddress = require('addressit'); // local street-address parser
         return nativeSetRequestHeader.call(this, name, value);
       };
 
+      // True for Gemini's current processSession transport (the prompt POST
+      // and the long-poll GET that streams replies back).
+      const isProcessSession = (url) => {
+        try {
+          const parsed = new URL(url, root.location.href);
+          return parsed.hostname === 'geminiweb-pa.clients6.google.com' && parsed.pathname === '/v1/processSession';
+        } catch {
+          return false;
+        }
+      };
+
+      // Response-side restoration for one XHR instance. Classic chat streams
+      // (StreamGenerate etc.) use the append-only text path; Gemini's
+      // processSession uses length-prefixed RPC frames, so each COMPLETE
+      // frame is parsed, restored from the inside out, and re-emitted with a
+      // corrected length prefix while partial frames are held (or flushed at
+      // readyState 4).
+      const installResponseGetters = (xhr, geminiRpc) => {
+        const responseType = xhr.responseType || '';
+        const streamed = { delivered: '', restored: '' };
+        // Characters from here to the end might be the start of a token
+        // ("[PERSON_1" split across progress events) — same rule as
+        // restoreStream: only an incomplete prefix of a real token holds.
+        const holdBackLength = (raw) => {
+          const tokens = masker.tokens();
+          if (!tokens.length) return raw.length;
+          const maxLength = masker.maxTokenLength();
+          const searchFrom = Math.max(0, raw.length - maxLength);
+          let safeLength = raw.length;
+          for (let index = searchFrom; index < raw.length; index += 1) {
+            if (raw.charCodeAt(index) !== 91) continue; // '['
+            const tail = raw.slice(index);
+            if (tokens.some((token) => token.length > tail.length && token.startsWith(tail))) {
+              safeLength = index;
+              break;
+            }
+          }
+          return safeLength;
+        };
+        const restoredTextSoFar = (raw) => {
+          if (!raw.startsWith(streamed.delivered)) {
+            // Defensive: a different payload than the one we were restoring
+            // (should not happen on a single XHR) — restart cleanly.
+            streamed.delivered = '';
+            streamed.restored = '';
+          }
+          const transferFinished = xhr.readyState === 4;
+          const safeLength = transferFinished ? raw.length : holdBackLength(raw);
+          if (safeLength > streamed.delivered.length) {
+            streamed.restored += masker.restoreText(raw.slice(streamed.delivered.length, safeLength));
+            streamed.delivered = raw.slice(0, safeLength);
+          }
+          return streamed.restored;
+        };
+        // ProcessSession frames: "<byte-length>\n<json>". Tokens live inside
+        // base64 protobuf strings nested in that JSON (the reply text is a
+        // prose field), so restoration is per complete frame; the length
+        // prefix is recomputed from the restored JSON's UTF-8 byte length so
+        // the page's frame parser stays in sync. Inter-frame whitespace and
+        // incomplete frames pass through verbatim.
+        const restoredRpcSoFar = (raw) => {
+          if (!raw.startsWith(streamed.delivered)) {
+            streamed.delivered = '';
+            streamed.restored = '';
+          }
+          const transferFinished = xhr.readyState === 4;
+          let position = streamed.delivered.length;
+          let out = streamed.restored;
+          while (position < raw.length) {
+            const character = raw[position];
+            if (character === '\n' || character === '\r') {
+              out += character;
+              position += 1;
+              continue;
+            }
+            const newline = raw.indexOf('\n', position);
+            if (newline === -1) {
+              if (transferFinished) {
+                out += raw.slice(position);
+                position = raw.length;
+              }
+              break;
+            }
+            const lengthText = raw.slice(position, newline);
+            if (!/^\d{1,8}$/.test(lengthText)) {
+              if (transferFinished) {
+                out += raw.slice(position);
+                position = raw.length;
+              }
+              break;
+            }
+            const frameLength = Number(lengthText);
+            const frameStart = newline + 1;
+            if (raw.length < frameStart + frameLength) {
+              if (transferFinished) {
+                out += raw.slice(position);
+                position = raw.length;
+              }
+              break;
+            }
+            out += restoreRpcChunk(lengthText, raw.slice(frameStart, frameStart + frameLength), (text) => masker.restoreText(text));
+            position = frameStart + frameLength;
+          }
+          if (position > streamed.delivered.length) {
+            streamed.delivered = raw.slice(0, position);
+            streamed.restored = out;
+          }
+          return streamed.restored;
+        };
+        const restoredSoFar = geminiRpc ? restoredRpcSoFar : restoredTextSoFar;
+        const addRestoredGetter = (property, descriptor) => {
+          if (!descriptor?.get) return;
+          try {
+            Object.defineProperty(xhr, property, {
+              configurable: true,
+              enumerable: descriptor.enumerable,
+              get() {
+                const result = descriptor.get.call(xhr);
+                if (typeof result !== 'string') return masker.restoreValue(result);
+                try {
+                  return restoredSoFar(result);
+                } catch {
+                  // Never break the page over restoration.
+                  return masker.restoreValue(result);
+                }
+              }
+            });
+          } catch {
+            root.console?.warn(`[Cloak] Could not restore XMLHttpRequest ${property}; response tokens may remain visible.`);
+          }
+        };
+        // '' (text) and 'text' expose both properties; 'json' only exposes one.
+        if (responseType === '' || responseType === 'text') addRestoredGetter('responseText', responseTextDescriptor);
+        if (responseType === '' || responseType === 'text' || responseType === 'json') addRestoredGetter('response', responseDescriptor);
+      };
+
       xhrPrototype.send = function (body) {
         const requestInfo = xhrRequests.get(this);
-        // Non-POST, non-chat, or no body: nothing to rewrite.
-        if (!requestInfo || requestInfo.method !== 'POST' || !isTargetRequest(requestInfo.url, root.location.href) || body == null) {
+        if (!requestInfo || !isTargetRequest(requestInfo.url, root.location.href)) {
+          return nativeSend.call(this, body);
+        }
+        // Replies ride on the processSession long-poll (a GET), so wrap the
+        // response side for every method — not just the POST carrying the
+        // prompt. The long-poll has no body to rewrite.
+        const geminiRpc = isProcessSession(requestInfo.url);
+        if (geminiRpc) installResponseGetters(this, true);
+        if (requestInfo.method !== 'POST' || body == null) {
           return nativeSend.call(this, body);
         }
 
@@ -743,78 +1108,18 @@ const parseAddress = require('addressit'); // local street-address parser
         root.postMessage({ type: 'CLOAK_REQUEST_STATS', requestsChecked: 1, valuesMasked: maskedCount }, root.location.origin);
         if (entries.length) root.postMessage({ type: 'CLOAK_MASKED_DATA', entries }, root.location.origin);
 
-        // Wrap this instance's response getters so the page never sees tokens.
-        //
-        // STREAMING SAFETY: Gemini reads responseText after every progress
-        // event and tracks how much text it has already consumed. Restoring
-        // a token SHRINKS the text (token → original value), so restoring
-        // over already-delivered text shifts every offset the page has
-        // recorded — its frame parser desyncs, the completion frame is never
-        // consumed, and the UI freezes mid-sentence with the stop button up.
-        // So restoration here is APPEND-ONLY: we hand out a growing prefix
-        // that NEVER changes retroactively, holding back any tail that could
-        // still turn into a token, and flush the held tail at readyState 4
-        // (DONE) when no more bytes can arrive.
-        const responseType = this.responseType || '';
-        const streamed = { delivered: '', restored: '' };
-        // Characters from here to the end might be the start of a token
-        // ("[PERSON_1" split across progress events) — same rule as
-        // restoreStream: only an incomplete prefix of a real token holds.
-        const holdBackLength = (raw) => {
-          const tokens = masker.tokens();
-          if (!tokens.length) return raw.length;
-          const maxLength = masker.maxTokenLength();
-          const searchFrom = Math.max(0, raw.length - maxLength);
-          let safeLength = raw.length;
-          for (let index = searchFrom; index < raw.length; index += 1) {
-            if (raw.charCodeAt(index) !== 91) continue; // '['
-            const tail = raw.slice(index);
-            if (tokens.some((token) => token.length > tail.length && token.startsWith(tail))) {
-              safeLength = index;
-              break;
-            }
-          }
-          return safeLength;
-        };
-        const restoredSoFar = (raw) => {
-          if (!raw.startsWith(streamed.delivered)) {
-            // Defensive: a different payload than the one we were restoring
-            // (should not happen on a single XHR) — restart cleanly.
-            streamed.delivered = '';
-            streamed.restored = '';
-          }
-          const transferFinished = this.readyState === 4;
-          const safeLength = transferFinished ? raw.length : holdBackLength(raw);
-          if (safeLength > streamed.delivered.length) {
-            streamed.restored += masker.restoreText(raw.slice(streamed.delivered.length, safeLength));
-            streamed.delivered = raw.slice(0, safeLength);
-          }
-          return streamed.restored;
-        };
-        const addRestoredGetter = (property, descriptor) => {
-          if (!descriptor?.get) return;
-          try {
-            Object.defineProperty(this, property, {
-              configurable: true,
-              enumerable: descriptor.enumerable,
-              get() {
-                const result = descriptor.get.call(this);
-                if (typeof result !== 'string') return masker.restoreValue(result);
-                try {
-                  return restoredSoFar(result);
-                } catch {
-                  // Never break the page over restoration.
-                  return masker.restoreValue(result);
-                }
-              }
-            });
-          } catch {
-            root.console?.warn(`[Cloak] Could not restore XMLHttpRequest ${property}; response tokens may remain visible.`);
-          }
-        };
-        // '' (text) and 'text' expose both properties; 'json' only exposes one.
-        if (responseType === '' || responseType === 'text') addRestoredGetter('responseText', responseTextDescriptor);
-        if (responseType === '' || responseType === 'text' || responseType === 'json') addRestoredGetter('response', responseDescriptor);
+        // Classic (non-RPC) providers also stream replies; wrap their getters
+        // with the append-only text path. STREAMING SAFETY: Gemini reads
+        // responseText after every progress event and tracks how much text it
+        // has already consumed. Restoring a token SHRINKS the text (token →
+        // original value), so restoring over already-delivered text shifts
+        // every offset the page has recorded — its frame parser desyncs, the
+        // completion frame is never consumed, and the UI freezes mid-sentence
+        // with the stop button up. So restoration here is APPEND-ONLY: we
+        // hand out a growing prefix that NEVER changes retroactively, holding
+        // back any tail that could still turn into a token, and flush the
+        // held tail at readyState 4 (DONE) when no more bytes can arrive.
+        if (!geminiRpc) installResponseGetters(this, false);
         return nativeSend.call(this, rewrittenBody);
       };
     }

@@ -826,6 +826,226 @@ test('preserves the inferred form content type when rewriting URLSearchParams', 
 });
 
 // ---------------------------------------------------------------------------
+// Gemini processSession transport (2026): prompts ride as base64 protobuf
+// form parts (req0___data__, req1___data__) on
+// geminiweb-pa.clients6.google.com/v1/processSession, and replies stream as
+// length-prefixed RPC frames ("<byte-length>\n<json>") whose JSON nests the
+// same protobufs. Cloak must mask inside the request protobufs and restore
+// inside complete reply frames — with a corrected length prefix each time.
+// ---------------------------------------------------------------------------
+
+// Tiny protobuf encoders so the suite builds wire-shaped payloads locally
+// instead of shipping captured request bytes.
+const encVarint = (value) => {
+  const out = [];
+  let remaining = value;
+  do {
+    let byte = remaining % 128;
+    remaining = Math.floor(remaining / 128);
+    if (remaining > 0) byte += 128;
+    out.push(byte);
+  } while (remaining > 0);
+  return out;
+};
+const encTag = (field, wireType) => encVarint(field * 8 + wireType);
+const encBytesField = (field, bytes) => [...encTag(field, 2), ...encVarint(bytes.length), ...bytes];
+const encStringField = (field, text) => encBytesField(field, [...Buffer.from(text, 'utf8')]);
+const encVarintField = (field, value) => [...encTag(field, 0), ...encVarint(value)];
+// Observed req1 shape: field 2 { field 1: varint, field 9 { field 1: string(prompt) } }.
+const buildUserPart = (prompt) => encBytesField(2, [
+  ...encVarintField(1, 1),
+  ...encBytesField(9, encStringField(1, prompt))
+]);
+// Session metadata: non-prose strings that must pass through byte-identical.
+const buildSessionPart = () => encBytesField(1, [
+  ...encVarintField(1, 1),
+  ...encStringField(2, 'cf41b0e0dd7d53e5'),
+  ...encStringField(3, 'en-US')
+]);
+
+test('masks PII inside Gemini processSession protobuf request parts', () => {
+  const masker = createMasker();
+  const sessionPart = buildSessionPart();
+  const prompt = 'My name is John Doe. My email is tester@example.test and my phone is 415-555-0199.';
+  const body = `count=2&ofs=0&req0___data__=${Buffer.from(sessionPart).toString('base64')}&req1___data__=${Buffer.from(buildUserPart(prompt)).toString('base64')}`;
+  // Google sometimes omits Content-Type on this endpoint; detection is by body shape.
+  const rewritten = masker.rewriteBody(body, '');
+  const params = new URLSearchParams(rewritten);
+
+  // Session metadata is not prose — the part must survive byte-identical.
+  assert.equal(params.get('req0___data__'), Buffer.from(sessionPart).toString('base64'));
+  // The user part now carries tokens instead of the originals.
+  const sentText = Buffer.from(params.get('req1___data__'), 'base64').toString('utf8');
+  assert.match(sentText, /\[PERSON_\d+_[a-z0-9-]+\]/);
+  assert.match(sentText, /\[EMAIL_\d+_[a-z0-9-]+\]/);
+  assert.match(sentText, /\[PHONE_\d+_[a-z0-9-]+\]/);
+  assert.equal(sentText.includes('John Doe'), false);
+  assert.equal(sentText.includes('tester@example.test'), false);
+  assert.equal(sentText.includes('415-555-0199'), false);
+  assert.equal(masker.takeMaskedCount(), 3);
+  // Same restore map the response path uses brings the originals back.
+  const restored = masker.restoreText(sentText);
+  assert.match(restored, /John Doe/);
+  assert.match(restored, /tester@example\.test/);
+  assert.match(restored, /415-555-0199/);
+});
+
+// The frame-aware response path is per-XHR-instance bundle wiring, so this
+// one runs through the vm bundle like the other integration tests. Note the
+// sandbox needs atob/btoa: the codec uses them to decode the nested base64.
+test('XHR restores tokens inside processSession RPC response frames', () => {
+  const listeners = new Map();
+  const messages = [];
+  class MockXHR {
+    constructor() {
+      this.headers = {};
+      this.responseType = '';
+      this.status = 200;
+      this.readyState = 2; // LOADING — the long-poll is still open
+      this._responseText = '';
+    }
+    open(method, url) {
+      this.method = method;
+      this.url = url;
+    }
+    setRequestHeader(name, value) {
+      this.headers[name.toLowerCase()] = value;
+    }
+    send(body) {
+      this.sentBody = body;
+      const params = new URLSearchParams(body);
+      const text = Buffer.from(params.get('req1___data__'), 'base64').toString('utf8');
+      this.mintedTokens = text.match(/\[(?:PERSON|PHONE|EMAIL)_[^\]]+\]/g) || [];
+      this._responseText = '';
+    }
+  }
+  Object.defineProperty(MockXHR.prototype, 'responseText', {
+    configurable: true,
+    get() { return this._responseText; }
+  });
+  Object.defineProperty(MockXHR.prototype, 'response', {
+    configurable: true,
+    get() { return this._responseText; }
+  });
+
+  const pageWindow = {
+    location: {
+      href: 'https://gemini.google.com/app',
+      origin: 'https://gemini.google.com',
+      hostname: 'gemini.google.com'
+    },
+    XMLHttpRequest: MockXHR,
+    URL,
+    URLSearchParams,
+    Headers,
+    Request,
+    Response,
+    TransformStream,
+    console: { info() {}, warn() {} },
+    addEventListener: (type, listener) => listeners.set(type, listener),
+    postMessage: (message) => messages.push(message),
+    fetch: async () => new Response('ok')
+  };
+  const source = fs.readFileSync(require.resolve('../intercept.bundle.js'), 'utf8');
+  vm.runInNewContext(source, {
+    require,
+    window: pageWindow,
+    URL,
+    URLSearchParams,
+    Headers,
+    Request,
+    Response,
+    TransformStream,
+    TextEncoder,
+    TextDecoder,
+    atob: (value) => Buffer.from(value, 'base64').toString('binary'),
+    btoa: (value) => Buffer.from(value, 'binary').toString('base64')
+  });
+  listeners.get('message')({
+    source: pageWindow,
+    origin: pageWindow.location.origin,
+    data: { type: 'CLOAK_CONFIG', enabled: true, settings: {} }
+  });
+
+  const prompt = 'my name is bob and my phone number is 919-123-4567';
+  const xhr = new pageWindow.XMLHttpRequest();
+  xhr.open('POST', 'https://geminiweb-pa.clients6.google.com/v1/processSession');
+  xhr.send(new URLSearchParams({
+    count: '2',
+    ofs: '0',
+    req0___data__: Buffer.from(buildSessionPart()).toString('base64'),
+    req1___data__: Buffer.from(buildUserPart(prompt)).toString('base64')
+  }).toString());
+
+  // Outgoing: tokens on the wire, originals gone.
+  const personToken = xhr.mintedTokens.find((token) => token.startsWith('[PERSON')) || '';
+  const phoneToken = xhr.mintedTokens.find((token) => token.startsWith('[PHONE')) || '';
+  assert.ok(personToken && phoneToken, 'prompt must mint both tokens');
+  const sentText = Buffer.from(new URLSearchParams(xhr.sentBody).get('req1___data__'), 'base64').toString('utf8');
+  assert.equal(sentText.includes(personToken), true);
+  assert.equal(sentText.includes(phoneToken), true);
+  assert.equal(sentText.includes('bob'), false);
+  assert.equal(sentText.includes('919-123-4567'), false);
+
+  // Reply: a length-prefixed RPC frame whose JSON nests a base64 protobuf
+  // holding the token-bearing answer — the shape Gemini streams today.
+  const replyProto = encStringField(1, `Sure — ${personToken} stays ${phoneToken}.`);
+  const replyJson = JSON.stringify([[0, ['c', Buffer.from(replyProto).toString('base64'), '', 8, 15, 30000]]]);
+  const frame = `${Buffer.byteLength(replyJson, 'utf8')}\n${replyJson}`;
+
+  const snapshots = [];
+  const read = () => {
+    const text = xhr.responseText;
+    snapshots.push(text);
+    return text;
+  };
+
+  // Progress 1: the frame is split mid-JSON — an incomplete frame is held.
+  xhr._responseText = frame.slice(0, Math.floor(frame.length / 2));
+  assert.equal(read(), '');
+
+  // Progress 2: the frame completes — restored with a corrected length prefix.
+  xhr._responseText = frame;
+  const full = read();
+  const newline = full.indexOf('\n');
+  const lengthText = full.slice(0, newline);
+  const deliveredJson = full.slice(newline + 1);
+  assert.match(lengthText, /^\d+$/);
+  assert.equal(Number(lengthText), Buffer.byteLength(deliveredJson, 'utf8'), 'length prefix must match the restored frame bytes');
+  const deliveredText = Buffer.from(JSON.parse(deliveredJson)[0][1][1], 'base64').toString('utf8');
+  assert.match(deliveredText, /bob/);
+  assert.match(deliveredText, /919-123-4567/);
+  assert.equal(deliveredText.includes(personToken), false);
+  assert.equal(deliveredText.includes(phoneToken), false);
+
+  // Progress 3: a second frame arrives behind an inter-frame separator; the
+  // first frame must not be re-delivered differently (append-only).
+  const tailJson = JSON.stringify([[0, ['c', 'done']]]);
+  const tailFrame = `${Buffer.byteLength(tailJson, 'utf8')}\n${tailJson}`;
+  xhr._responseText = `${frame}\r\n${tailFrame}`;
+  const third = read();
+  assert.equal(third.startsWith(full), true);
+  assert.equal(third.includes('\r\n'), true);
+  assert.equal(third.endsWith(tailFrame), true);
+
+  // DONE: any trailing partial bytes flush verbatim instead of being held.
+  xhr.readyState = 4;
+  xhr._responseText = `${frame}\r\n${tailFrame}9\nleft-over`;
+  const flushed = read();
+  assert.equal(flushed.endsWith('9\nleft-over'), true);
+
+  // Regression guard: every read is a prefix of the next.
+  for (let i = 1; i < snapshots.length; i += 1) {
+    assert.equal(
+      snapshots[i].startsWith(snapshots[i - 1]),
+      true,
+      `read ${i} changed already-delivered text`
+    );
+  }
+  assert.equal(messages.some(({ type, valuesMasked }) => type === 'CLOAK_REQUEST_STATS' && valuesMasked >= 3), true);
+});
+
+// ---------------------------------------------------------------------------
 // Deployment-context contract
 // ---------------------------------------------------------------------------
 
