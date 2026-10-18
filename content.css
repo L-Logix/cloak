@@ -80,12 +80,103 @@
   opacity: 1;
 }
 
+/* ---------- reveal consent dialog ---------- */
+/* The only Cloak element that captures pointer events: the user must
+   answer before getting back to the chat. Centered card on a soft scrim,
+   sage palette shared with the badge so it reads as unmistakably Cloak. */
+.cloak-reveal {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647; /* topmost — sits above every site layer */
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(12 18 14 / 55%); /* scrim dims the chat behind the ask */
+  font: 14px/1.5 "Avenir Next", Avenir, "Segoe UI", sans-serif;
+}
+
+.cloak-reveal-card {
+  width: min(430px, calc(100vw - 32px));
+  padding: 22px 24px 18px;
+  border: 1px solid #aab4ad;
+  border-radius: 12px;
+  color: #1d2a22;
+  background: #fff;
+  box-shadow: 0 18px 48px rgb(8 16 11 / 30%);
+}
+
+.cloak-reveal-title {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.cloak-reveal-body {
+  margin: 0 0 16px;
+  color: #3d4a42;
+}
+
+/* The exact value being released, spelled out in a chip — no ambiguity
+   about what "Share" means. */
+.cloak-reveal-value {
+  display: inline-block;
+  padding: 1px 7px;
+  border: 1px solid #c5d2ca;
+  border-radius: 5px;
+  background: #f1f6f2;
+  color: #17351f;
+  font: 12.5px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;
+  word-break: break-all;
+}
+
+.cloak-reveal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.cloak-reveal-actions button {
+  padding: 8px 16px;
+  border-radius: 7px;
+  font: 600 13.5px/1 "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  cursor: pointer;
+}
+
+.cloak-reveal-deny {
+  border: 1px solid #b7c3bb;
+  color: #35443b;
+  background: #fff;
+}
+
+.cloak-reveal-deny:hover { background: #f2f6f3; }
+
+.cloak-reveal-grant {
+  border: 1px solid #2f7a52;
+  color: #fff;
+  background: #2f7a52;
+}
+
+.cloak-reveal-grant:hover { background: #276945; }
+
+.cloak-reveal-note {
+  margin: 14px 0 0;
+  color: #6a7a71;
+  font-size: 12px;
+}
+
 /* ---------- dark theme ---------- */
 /* Chat sites flip to dark at night; invert both elements to match. */
 @media (prefers-color-scheme: dark) {
   .cloak-mask-badge { border-color: #63716a; color: #c0cbc3; background: #222b25; }
   .cloak-mask-badge[data-active="true"] { border-color: #70b6e8; color: #86c8f4; }
   .cloak-media-banner { border-color: #645c3c; color: #f0e9cc; background: #302d20; }
+  .cloak-reveal { background: rgb(0 0 0 / 62%); }
+  .cloak-reveal-card { border-color: #4a564f; color: #e7ede9; background: #1c241f; }
+  .cloak-reveal-body { color: #b9c4bd; }
+  .cloak-reveal-value { border-color: #46554c; color: #bfe3c9; background: #26302a; }
+  .cloak-reveal-deny { border-color: #4a564f; color: #c6d0ca; background: #232b26; }
+  .cloak-reveal-deny:hover { background: #2b342e; }
+  .cloak-reveal-note { color: #8d9a93; }
 }
 
 /* ---------- reduced motion ---------- */

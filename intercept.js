@@ -60,6 +60,40 @@ const parseAddress = require('addressit'); // local street-address parser
   // count=2&ofs=0&req0___data__=<base64>&req1___data__=<base64>.
   const GEMINI_RPC_FORM_PATTERN = /^count=\d+&ofs=\d+&req\d+___data__=/;
 
+  // ---- Cloak reveal protocol (consent flow) --------------------------------
+  // A masked placeholder can BLOCK a real task: "schedule a meeting with
+  // [EMAIL_1_ab12cd]" is unusable by the model. Cloak therefore appends a
+  // short notice to every masked Gemini prompt explaining that brackets are
+  // LOCAL placeholders and that the model can ask — with one magic line —
+  // for the single value it truly needs. When that magic line comes back in
+  // the reply, the reveal scanner (below) strips it before the page renders
+  // it and asks the user for consent via the content script.
+  const REVEAL_HEAD = 'Requesting access to know ';
+  const REVEAL_TAIL = ' from Cloak';
+  // The exact one-line reply Cloak looks for. <PLACEHOLDER> is replaced by
+  // Gemini with a real token like [EMAIL_1_ab12cd]. Tolerant of light model
+  // formatting drift: leading/trailing whitespace, markdown wrappers (`*_),
+  // and a trailing punctuation mark — the sentence + token must be intact.
+  const REVEAL_LINE_PATTERN = /^[ \t]*[*_`]{0,3}[ \t]*Requesting access to know (\[(?:PERSON|ADDRESS|EMAIL|PHONE|CUSTOM)_\d+_[a-z0-9-]+\]) from Cloak[.!?,;]*[*_`]{0,3}[ \t]*$/i;
+  // Lead-in a reveal line may carry before the sentence itself; stripped
+  // when deciding whether an incomplete line could still become one.
+  const REVEAL_LEADIN_PATTERN = /^[ \t]*[*_`]{0,3}[ \t]*/;
+  // Any masked token — used to find the prompt field that needs the notice.
+  const TOKEN_PATTERN = /\[(?:PERSON|ADDRESS|EMAIL|PHONE|CUSTOM)_\d+_[a-z0-9-]+\]/;
+  // Appended (once) to the masked prompt that contains tokens. Wording is
+  // deliberate: tells the model what brackets are, gives the exact magic
+  // line format, and warns against asking unless truly required — otherwise
+  // every reply would nag for access.
+  const REVEAL_INSTRUCTION = `[Cloak privacy notice] Values shown in square brackets like [EMAIL_1_ab12cd] are placeholders inserted by the Cloak browser extension on the user's device; the real values were never sent to you. If you need a specific placeholder's real value to complete this request, reply with ONE line in exactly this format and nothing else:
+${REVEAL_HEAD}<PLACEHOLDER>${REVEAL_TAIL}
+Cloak will ask the user for consent and, if granted, will resend this conversation with the real value filled in. Do not request access unless the value is truly required to finish the task.`;
+  // The reply sentence Cloak hunts for, in either form: the raw TOKEN (if
+  // captured before restoration) or the RESTORED value (restoration runs
+  // first on both response paths). /gi and used ONLY through matchAll /
+  // replace — both clone or reset lastIndex per call — so one shared
+  // instance can never leak matcher state between scanners.
+  const REVEAL_MAGIC_PATTERN = /[*_`]*[ \t]*Requesting access to know (.+?) from Cloak[.!?,;]*[*_`]{0,3}[ \t]*/gi;
+
   // ---- Small helpers ------------------------------------------------------
 
   // Make a literal safe to embed in a RegExp (".", "(" etc. must stay literal).
@@ -293,6 +327,7 @@ const parseAddress = require('addressit'); // local street-address parser
     const originalToToken = new Map(); // dedupe direction: value → token
     const suffixIndex = new Map();     // hash suffix → display index ([PERSON_1_…])
     const pendingEntries = [];         // new vault rows waiting to be reported
+    const consented = new Set();       // tokens the user APPROVED sharing in clear text
     let sortedTokens = null;           // cached restore order (see restoreText)
 
     // Mint (or reuse) the token for a value. Reuse is what stops the vault
@@ -315,6 +350,17 @@ const parseAddress = require('addressit'); // local street-address parser
       return token;
     }
 
+    // Mask one occurrence — UNLESS the user previously approved sharing this
+    // exact value (consent flow: see CLOAK_CONSENT in install()). A consented
+    // value passes through in clear text and is not counted as "masked", so
+    // the follow-up message Gemini asked for actually carries the real value.
+    function substitute(category, original) {
+      const existing = originalToToken.get(original);
+      if (existing && consented.has(existing)) return original;
+      maskedCount += 1;
+      return register(category, original);
+    }
+
     // Mask one plain string of prompt text. Order matters: custom terms first
     // (user intent wins), then names, addresses, emails, phones — longest and
     // most structural first so inner values are already tokens when later
@@ -328,32 +374,21 @@ const parseAddress = require('addressit'); // local street-address parser
         : [];
       for (const term of customTerms) {
         const expression = new RegExp(`(?<![\\p{L}\\p{N}_])${escapeRegExp(term)}(?![\\p{L}\\p{N}_])`, 'giu');
-        text = text.replace(expression, (match) => {
-          maskedCount += 1;
-          return register('CUSTOM', match);
-        });
+        text = text.replace(expression, (match) => substitute('CUSTOM', match));
       }
       if (settings.names) {
         // Spans are right-to-left, so splicing never shifts later offsets.
         for (const span of findPersonSpans(text)) {
-          maskedCount += 1;
-          text = `${text.slice(0, span.start)}${register('PERSON', span.value)}${text.slice(span.end)}`;
+          text = `${text.slice(0, span.start)}${substitute('PERSON', span.value)}${text.slice(span.end)}`;
         }
       }
       if (settings.addresses) {
         for (const span of findAddressSpans(text)) {
-          maskedCount += 1;
-          text = `${text.slice(0, span.start)}${register('ADDRESS', span.value)}${text.slice(span.end)}`;
+          text = `${text.slice(0, span.start)}${substitute('ADDRESS', span.value)}${text.slice(span.end)}`;
         }
       }
-      if (settings.emails) text = text.replace(EMAIL_PATTERN, (email) => {
-        maskedCount += 1;
-        return register('EMAIL', email);
-      });
-      if (settings.phones) text = text.replace(PHONE_PATTERN, (phone) => {
-        maskedCount += 1;
-        return register('PHONE', phone);
-      });
+      if (settings.emails) text = text.replace(EMAIL_PATTERN, (email) => substitute('EMAIL', email));
+      if (settings.phones) text = text.replace(PHONE_PATTERN, (phone) => substitute('PHONE', phone));
       return text;
     }
 
@@ -391,6 +426,7 @@ const parseAddress = require('addressit'); // local street-address parser
       maskedCount = 0; // each rewrite starts a fresh count for the stats message
       if (GEMINI_RPC_FORM_PATTERN.test(body)) {
         const params = new URLSearchParams(body);
+        let instructionAppended = false; // at most ONE notice per request
         for (const key of [...new Set(params.keys())]) {
           if (!/^req\d+___data__$/.test(key)) continue;
           const original = params.get(key);
@@ -401,7 +437,20 @@ const parseAddress = require('addressit'); // local street-address parser
             continue; // not base64 — leave the part alone
           }
           const mapped = mapProtobufProse(bytes, (text) => maskText(text));
-          if (mapped.changed) params.set(key, encodeBase64Flexible(mapped.bytes, isUrlSafeBase64(original)));
+          if (mapped.changed) {
+            let outBytes = mapped.bytes;
+            // If this part actually contains tokens (i.e. it carries the
+            // user's prompt), append the reveal notice so Gemini knows the
+            // brackets are placeholders and how to ask for the real value.
+            if (!instructionAppended && maskedCount > 0) {
+              const amended = amendLastProseWithInstruction(outBytes);
+              if (amended.changed) {
+                outBytes = amended.bytes;
+                instructionAppended = true;
+              }
+            }
+            params.set(key, encodeBase64Flexible(outBytes, isUrlSafeBase64(original)));
+          }
         }
         return params.toString();
       }
@@ -451,9 +500,22 @@ const parseAddress = require('addressit'); // local street-address parser
       clear() {
         tokenToOriginal.clear();
         originalToToken.clear();
+        consented.clear();
         sortedTokens = null;
         pendingEntries.length = 0;
       },
+      // User clicked "Share" on the consent dialog: this token's real value
+      // may now travel in clear text for subsequent requests.
+      grantConsent(token) {
+        if (tokenToOriginal.has(token)) consented.add(token);
+      },
+      // Look up the real value behind a token (used to build the consent UI).
+      originalFor: (token) => tokenToOriginal.get(token) || '',
+      // Reverse lookup (value → token): a reveal request captured AFTER
+      // response restoration arrives carrying the original text, not the
+      // token, so the scanner's handler maps it back before talking to the
+      // content script.
+      tokenFor: (original) => originalToToken.get(original) || '',
       hasMappings: () => tokenToOriginal.size > 0,
       shouldRestoreResponses: () => settings.restoreResponses !== false,
       activeCategories: () => ['names', 'emails', 'phones', 'addresses'].filter((category) => settings[category] !== false),
@@ -768,6 +830,175 @@ const parseAddress = require('addressit'); // local street-address parser
     return `${protoTextEncoder.encode(json).length}\n${json}`;
   }
 
+  // ---- Reveal protocol: prompt notice + reply scanner ----------------------
+
+  // Append REVEAL_INSTRUCTION to the LAST prose field that contains a token
+  // (depth-first walk — in Gemini's wire format that field is the user's
+  // newest prompt, so the notice lands right after the question it applies
+  // to). Any field structure is rebuilt bottom-up with corrected length
+  // prefixes; if no token-bearing prose field exists, nothing is changed.
+  function amendLastProseWithInstruction(bytes) {
+    const fields = parseProtobuf(bytes);
+    if (!fields) return { bytes, changed: false };
+    // Pass 1: find the target — the last plain-text field holding a token —
+    // as an index PATH (e.g. [0, 1, 0] = top field 0 → sub field 1 → sub
+    // field 0). The rebuild pass below re-parses the buffer itself, so its
+    // entry objects are NOT the ones found here: identity would never match
+    // past the top level, which is exactly why nested prompts silently got
+    // no notice before.
+    let target = null;
+    const findTarget = (list, path) => {
+      for (let index = 0; index < list.length; index += 1) {
+        const entry = list[index];
+        if (entry.wireType !== 2) continue;
+        const sub = parseProtobuf(entry.bytes);
+        // Structure first: a genuine submessage keeps its token text one
+        // level deeper (that is where the prompt string lives).
+        if (sub && sub.length) findTarget(sub, [...path, index]);
+        // Fallback: REAL prompt strings sometimes parse as messages too
+        // (a leading letter plus token digits can mimic tags), so a field
+        // the deeper hunt came back empty from is re-checked as text — but
+        // only when it is CLEAN prose. A submessage's own bytes start with
+        // a control tag byte (\x08/\x0a/\x12…) and can never claim this
+        // spot; a human sentence starts with a printable character. LAST
+        // hit wins, preserving the "newest prompt" rule.
+        try {
+          const text = protoTextDecoder.decode(entry.bytes);
+          if (/^[^\u0000-\u001F\u007F]/.test(text) && looksLikeProse(text) && TOKEN_PATTERN.test(text)) {
+            target = { path: [...path, index], text };
+          }
+        } catch {
+          // Not UTF-8 — binary field, never a candidate.
+        }
+      }
+    };
+    findTarget(fields, []);
+    if (!target) return { bytes, changed: false };
+    // Pass 2: rebuild the tree, walking the recorded path and swapping the
+    // target's text for the amended version. Every ancestor along the way is
+    // re-serialized, so all length prefixes stay correct (the bug class that
+    // once broke live requests).
+    const amendedBytes = protoTextEncoder.encode(`${target.text}\n\n${REVEAL_INSTRUCTION}`);
+    const rebuild = (list, depth) => {
+      let changed = false;
+      const out = list.map((entry, index) => {
+        const onPath = index === target.path[depth];
+        if (onPath && depth === target.path.length - 1) {
+          changed = true; // the leaf itself — swap in the amended text
+          return { field: entry.field, wireType: 2, bytes: amendedBytes };
+        }
+        if (onPath && entry.wireType === 2) {
+          const sub = parseProtobuf(entry.bytes);
+          if (sub && sub.length) {
+            const next = rebuild(sub, depth + 1);
+            if (next.changed) {
+              changed = true;
+              return { field: entry.field, wireType: 2, bytes: serializeProtobuf(next.fields) };
+            }
+          }
+        }
+        return entry;
+      });
+      return { fields: out, changed };
+    };
+    const rebuilt = rebuild(fields, 0);
+    if (!rebuilt.changed) return { bytes, changed: false };
+    return { bytes: serializeProtobuf(rebuilt.fields), changed: true };
+  }
+
+  // Response-side scanner: hides Gemini's access-request sentence from the
+  // page and reports the value it asked for.
+  //
+  // The sentence can arrive in either form — with the raw token (if it was
+  // captured before restoration) or with the RESTORED value (restoration
+  // runs before this scanner). The capture group is whatever sits between
+  // "know " and " from Cloak"; install() resolves it back to a token.
+  //
+  // Append-only contract (Gemini's reader tracks offsets — a delivered
+  // prefix must never change), so feed() only ever appends to `display`:
+  //   • Complete newline-terminated lines resolve immediately: any magic
+  //     occurrence is extracted (reported + removed), the rest ships. A
+  //     line that merely STARTS like the sentence ("…know more about…")
+  //     can never stall the stream — the newline proves it is final.
+  //   • The trailing partial (no newline yet) is scanned IN PLACE first
+  //     (a sentence completed inside it — e.g. whole inside one JSON frame
+  //     — is extracted right away), then everything up to the START of the
+  //     last possibly-incomplete sentence ships, and the suspected suffix
+  //     waits for more bytes. Ordinary text has no such suffix, so it
+  //     streams with zero added lag.
+  //   • At transfer end the held tail flushes through the same extract.
+  function createRevealScanner(onReveal) {
+    let display = ''; // committed text — always safe to deliver, append-only
+    let hold = '';    // unresolved tail (possible partial magic sentence)
+    // Private /gi copy (fresh lastIndex) — matchAll/replace never leak state
+    // anyway, but one instance per scanner keeps that trivially true.
+    // Tolerates markdown wrappers, leading whitespace, and trailing
+    // punctuation around the core "…know <X> from Cloak" sentence.
+    const magicSentence = new RegExp(REVEAL_MAGIC_PATTERN.source, 'gi');
+    // Extract every completed magic sentence from `text`, reporting what it
+    // captured (token or restored value — install() resolves the shape),
+    // and return the text without them.
+    const extractMagic = (text) => {
+      if (!/Requesting access to know/i.test(text)) return text; // cheap reject
+      for (const hit of [...text.matchAll(magicSentence)]) onReveal(hit[1]);
+      return text.replace(magicSentence, '');
+    };
+    // True while `text` may END mid-sentence: its tail contains a full
+    // "Requesting access to know" (possibly a just-completed one being
+    // verified) or is itself a prefix of that head ("…Requestin").
+    const startsOrBuildsHead = (text) => {
+      const lower = text.toLowerCase();
+      const headLower = REVEAL_HEAD.toLowerCase();
+      const at = lower.lastIndexOf(headLower);
+      if (at !== -1) return true; // head present — sentence may be incomplete
+      // Longest suffix of the text that is a proper prefix of the head.
+      const max = Math.min(text.length, headLower.length - 1);
+      for (let len = max; len > 0; len -= 1) {
+        if (headLower.startsWith(lower.slice(lower.length - len))) return true;
+      }
+      return false;
+    };
+    const feed = (chunk, transferFinished) => {
+      hold += chunk;
+      // 1. Complete lines: newline proves the line is final — extract
+      //    whatever magic it holds and ship the rest.
+      for (;;) {
+        const newline = hold.indexOf('\n');
+        if (newline === -1) break;
+        display += `${extractMagic(hold.slice(0, newline))}\n`;
+        hold = hold.slice(newline + 1);
+      }
+      // 2. Trailing partial, no newline yet.
+      if (transferFinished) {
+        display += extractMagic(hold); // stream over — flush the tail
+        hold = '';
+      } else {
+        hold = extractMagic(hold); // completed sentences (frame-embedded) fire now
+        const at = hold.toLowerCase().lastIndexOf(REVEAL_HEAD.toLowerCase());
+        const cut = at !== -1
+          ? at // hold from the last full head — the sentence may be incomplete
+          : startsOrBuildsHead(hold) ? headCut(hold) : hold.length;
+        if (cut > 0) {
+          display += hold.slice(0, cut);
+          hold = hold.slice(cut);
+        }
+      }
+      return display;
+    };
+    // Start index of the suffix that is (a prefix of) the head — the point
+    // past which bytes must wait for the rest of the sentence.
+    const headCut = (text) => {
+      const lower = text.toLowerCase();
+      const headLower = REVEAL_HEAD.toLowerCase();
+      const max = Math.min(text.length, headLower.length - 1);
+      for (let len = max; len > 0; len -= 1) {
+        if (headLower.startsWith(lower.slice(lower.length - len))) return text.length - len;
+      }
+      return text.length;
+    };
+    return { feed };
+  }
+
   // ---- Page wiring --------------------------------------------------------
 
   // Runs in a chat page's main world. Wraps fetch and XHR so every outgoing
@@ -789,6 +1020,18 @@ const parseAddress = require('addressit'); // local street-address parser
       if (event.data.type === 'CLOAK_CLEAR_MEMORY') {
         masker.clear();
         root.console?.info('[PromptMask] Local token vault cleared.');
+      }
+      // The user answered the consent dialog: "Share" lets this one value
+      // travel in clear text from now on; "Don't share" changes nothing
+      // (the value stays masked) — the content script's follow-up message
+      // tells Gemini which happened.
+      if (event.data.type === 'CLOAK_CONSENT' && event.data.token) {
+        if (event.data.granted) {
+          masker.grantConsent(event.data.token);
+          root.console?.info(`[Cloak] User approved sharing ${event.data.token} with the AI in clear text.`);
+        } else {
+          root.console?.info(`[Cloak] User declined to share ${event.data.token}; it stays masked.`);
+        }
       }
     });
 
@@ -962,6 +1205,50 @@ const parseAddress = require('addressit'); // local street-address parser
       const installResponseGetters = (xhr, geminiRpc) => {
         const responseType = xhr.responseType || '';
         const streamed = { delivered: '', restored: '' };
+        // Reveal scanner: every restored chunk also passes through here,
+        // which HIDES Gemini's one-line "Requesting access to know … from
+        // Cloak" (the page never sees it) and posts the token to the content
+        // script so it can ask the user to share or decline. scannerFed
+        // tracks how much of the cumulative restored text the scanner has
+        // already consumed, so it only ever receives the new tail.
+        let scannerFed = 0;
+        // Both response paths report whatever sat between "know " and " from
+        // Cloak". If restoration already swapped the token for its original
+        // value, the capture is clear text — map it back to its token first
+        // (the content script keys everything on tokens). A capture we cannot
+        // resolve is still stripped from the page, but no dialog is shown.
+        const reportReveal = (captured) => {
+          const looksLikeToken = /^\[(?:PERSON|ADDRESS|EMAIL|PHONE|CUSTOM)_\d+_[a-z0-9-]+\]$/.test(captured);
+          const token = looksLikeToken ? captured : masker.tokenFor(captured);
+          if (!token) return; // unresolvable — line hidden, nothing to ask
+          root.postMessage({
+            type: 'CLOAK_REVEAL_REQUEST',
+            token,
+            original: looksLikeToken ? (masker.originalFor(token) || '') : captured
+          }, root.location.origin);
+        };
+        const scanner = createRevealScanner(reportReveal);
+        // Gemini's reply prose rides INSIDE base64 protobuf fields of each
+        // RPC frame — base64 has no spaces, so the cumulative scanner above
+        // can never see a sentence hidden in there. Strip at the point where
+        // a frame's prose is decoded (after restoration, so the capture is
+        // the restored value): a sentence complete within ONE frame is
+        // removed from the bytes the page will receive and reported here.
+        // (A sentence split across two frames cannot be joined — each frame
+        // is an independent base64 blob — models emit this short line in a
+        // single delta in practice.)
+        const frameMagic = new RegExp(REVEAL_MAGIC_PATTERN.source, 'gi');
+        const stripFrameReveal = (text) => {
+          if (!/Requesting access to know/i.test(text)) return text;
+          for (const hit of [...text.matchAll(frameMagic)]) reportReveal(hit[1]);
+          return text.replace(frameMagic, '');
+        };
+        const scanReveal = (cumulativeRestored, transferFinished) => {
+          if (cumulativeRestored.length < scannerFed) scannerFed = 0; // stream restarted
+          const tail = cumulativeRestored.slice(scannerFed);
+          scannerFed = cumulativeRestored.length;
+          return scanner.feed(tail, transferFinished);
+        };
         // Characters from here to the end might be the start of a token
         // ("[PERSON_1" split across progress events) — same rule as
         // restoreStream: only an incomplete prefix of a real token holds.
@@ -994,7 +1281,7 @@ const parseAddress = require('addressit'); // local street-address parser
             streamed.restored += masker.restoreText(raw.slice(streamed.delivered.length, safeLength));
             streamed.delivered = raw.slice(0, safeLength);
           }
-          return streamed.restored;
+          return scanReveal(streamed.restored, transferFinished);
         };
         // ProcessSession frames: "<byte-length>\n<json>". Tokens live inside
         // base64 protobuf strings nested in that JSON (the reply text is a
@@ -1043,14 +1330,16 @@ const parseAddress = require('addressit'); // local street-address parser
               }
               break;
             }
-            out += restoreRpcChunk(lengthText, raw.slice(frameStart, frameStart + frameLength), (text) => masker.restoreText(text));
+            // Restore tokens first, then strip any completed reveal sentence
+            // from this frame's prose — the page never receives the line.
+            out += restoreRpcChunk(lengthText, raw.slice(frameStart, frameStart + frameLength), (text) => stripFrameReveal(masker.restoreText(text)));
             position = frameStart + frameLength;
           }
           if (position > streamed.delivered.length) {
             streamed.delivered = raw.slice(0, position);
             streamed.restored = out;
           }
-          return streamed.restored;
+          return scanReveal(streamed.restored, transferFinished);
         };
         const restoredSoFar = geminiRpc ? restoredRpcSoFar : restoredTextSoFar;
         const addRestoredGetter = (property, descriptor) => {
@@ -1140,7 +1429,17 @@ const parseAddress = require('addressit'); // local street-address parser
 
   // Node (the test suite) gets the internals via module.exports.
   if (typeof process !== 'undefined' && process.versions?.node && typeof module !== 'undefined') {
-    module.exports = { containsMediaIntent, createMasker, isTargetRequest, restoreStream };
+    module.exports = {
+      containsMediaIntent,
+      createMasker,
+      isTargetRequest,
+      restoreStream,
+      // Reveal protocol pieces (consent flow) — unit-tested directly.
+      createRevealScanner,
+      amendLastProseWithInstruction,
+      REVEAL_INSTRUCTION,
+      REVEAL_LINE_PATTERN
+    };
   }
 
   // Same bundle, two deployment contexts:

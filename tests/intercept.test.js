@@ -23,7 +23,12 @@ const {
   containsMediaIntent,
   createMasker,
   isTargetRequest,
-  restoreStream
+  restoreStream,
+  // Reveal protocol (consent flow): notice injection + reply scanner.
+  createRevealScanner,
+  amendLastProseWithInstruction,
+  REVEAL_INSTRUCTION,
+  REVEAL_LINE_PATTERN
 } = require('../intercept.js');
 
 // ---------------------------------------------------------------------------
@@ -983,7 +988,10 @@ test('keeps submessage nesting when the length byte is printable', () => {
   assert.equal(maskedPrompt.includes('415-555-0199'), false);
   // The corruption signature: stale structure bytes swallowed into the text.
   assert.equal(maskedPrompt.includes('\n~'), false);
-  assert.equal(masker.restoreText(maskedPrompt), prompt);
+  // The prompt itself restores exactly (the reveal notice, appended after
+  // masking, is the only extra text and restores with its placeholders intact).
+  assert.equal(masker.restoreText(maskedPrompt).startsWith(prompt), true);
+  assert.match(maskedPrompt, /\[Cloak privacy notice\]/);
 });
 
 // The frame-aware response path is per-XHR-instance bundle wiring, so this
@@ -1225,4 +1233,356 @@ test('installs interception on chat pages and keeps CloakPreview private', () =>
 
   assert.notEqual(pageWindow.fetch, nativeFetch, 'chat pages must get the wrapped fetch');
   assert.equal(pageWindow.CloakPreview, undefined, 'the preview factory must not leak into chat pages');
+});
+
+// ---------------------------------------------------------------------------
+// Reveal protocol (consent flow): the prompt notice, the reply scanner, and
+// the consented-value pass-through. Together these let Gemini say "I need
+// the real [EMAIL_1_…]" without ever exposing that request to the page —
+// Cloak hides the line, shows the user a Share/Decline dialog, and only a
+// "Share" makes the real value travel on the wire.
+// ---------------------------------------------------------------------------
+
+// The instruction rides along with EVERY masked Gemini prompt. This asserts
+// the wire result: one notice, appended to the token-bearing user part,
+// AFTER masking (it adds no tokens of its own) and with the exact one-line
+// request format the reply scanner is keyed to.
+test('appends the Cloak reveal notice to prompts that contain tokens', () => {
+  const masker = createMasker();
+  const sessionPart = buildSessionPart();
+  const prompt = 'My name is John Doe and my email is tester@example.test — book it for me.';
+  const body = `count=2&ofs=0&req0___data__=${Buffer.from(sessionPart).toString('base64')}&req1___data__=${Buffer.from(buildUserPart(prompt)).toString('base64')}`;
+  const rewritten = masker.rewriteBody(body, '');
+  const params = new URLSearchParams(rewritten);
+
+  // Session metadata still ships byte-identical — the notice only ever
+  // touches the part that actually carried PII.
+  assert.equal(params.get('req0___data__'), Buffer.from(sessionPart).toString('base64'));
+
+  const sentText = Buffer.from(params.get('req1___data__'), 'base64').toString('utf8');
+  // Exactly one notice, it sits at the very end of the prompt field, and it
+  // spells out the magic line the reply scanner later matches against.
+  assert.equal(sentText.split('[Cloak privacy notice]').length - 1, 1);
+  assert.equal(sentText.endsWith(REVEAL_INSTRUCTION), true);
+  assert.match(REVEAL_INSTRUCTION, /Requesting access to know <PLACEHOLDER> from Cloak/);
+  // Appending happened after masking: the count is still just the PII hits,
+  // and the originals are still gone from the wire.
+  assert.equal(masker.takeMaskedCount(), 2);
+  assert.equal(sentText.includes('John Doe'), false);
+  assert.equal(sentText.includes('tester@example.test'), false);
+});
+
+// No PII → no tokens → nothing to explain → the prompt must ship WITHOUT
+// the notice (otherwise every benign conversation gets nagging boilerplate).
+test('omits the reveal notice when the prompt contains no tokens', () => {
+  const masker = createMasker();
+  const prompt = 'What is the boiling point of water at sea level?';
+  const body = `count=1&ofs=0&req0___data__=${Buffer.from(buildUserPart(prompt)).toString('base64')}`;
+  const rewritten = masker.rewriteBody(body, '');
+  const sentText = Buffer.from(new URLSearchParams(rewritten).get('req0___data__'), 'base64').toString('utf8');
+
+  assert.equal(sentText.includes('Cloak privacy notice'), false);
+  assert.equal(sentText.includes(prompt), true); // prompt untouched
+  assert.equal(masker.takeMaskedCount(), 0);
+});
+
+// Direct unit test of the amender: rebuilds the protobuf tree bottom-up, so
+// every length prefix stays correct (the class of bug that once made Gemini
+// reject live requests). Targets the LAST token-bearing field — in Gemini's
+// wire format that is the newest prompt.
+test('amends the last token-bearing protobuf field with corrected lengths', () => {
+  // Field 1: prose without tokens (left alone). Field 2: token-bearing —
+  // both chosen so their leading bytes cannot parse as a nested message.
+  const bytes = Uint8Array.from([
+    ...encStringField(1, 'no tokens in this field'),
+    ...encStringField(2, 'Send this to [EMAIL_1_ab12cd] today')
+  ]);
+  const result = amendLastProseWithInstruction(bytes);
+  assert.equal(result.changed, true);
+
+  // Strict structural walk of the rewritten bytes: both fields still parse,
+  // field 1 is untouched, field 2 carries the original text + the notice.
+  const fields = parseProtoStrict(result.bytes);
+  assert.ok(fields, 'amended buffer must still parse as protobuf');
+  const first = Buffer.from(fields.find(({ field }) => field === 1).bytes).toString('utf8');
+  const second = Buffer.from(fields.find(({ field }) => field === 2).bytes).toString('utf8');
+  assert.equal(first, 'no tokens in this field');
+  assert.equal(second, 'Send this to [EMAIL_1_ab12cd] today\n\n' + REVEAL_INSTRUCTION);
+
+  // No token anywhere → unchanged, byte-identical (the rewriteBody gate
+  // relies on `changed: false` to skip re-encoding).
+  const plain = Uint8Array.from(encStringField(1, 'no tokens in this field'));
+  const untouched = amendLastProseWithInstruction(plain);
+  assert.equal(untouched.changed, false);
+  assert.deepEqual([...untouched.bytes], [...plain]);
+});
+
+// Happy path of the reply side: Gemini follows the format, the scanner
+// fires exactly one report with the token, and the page (which streams the
+// returned string to its renderer) NEVER sees the request line.
+test('hides Gemini reveal lines and reports their token', () => {
+  const reported = [];
+  const scanner = createRevealScanner((captured) => reported.push(captured));
+  const reply = 'Sure — done!\nRequesting access to know [EMAIL_1_ab12cd] from Cloak\nAnything else?';
+
+  const delivered = scanner.feed(reply, false);
+  assert.deepEqual(reported, ['[EMAIL_1_ab12cd]']);
+  assert.equal(delivered.includes('Requesting access'), false);
+  assert.equal(delivered.includes('[EMAIL_1_ab12cd]'), false);
+  assert.match(delivered, /Sure — done!/); // surrounding prose still renders
+  assert.match(delivered, /Anything else\?/);
+});
+
+// Models decorate the line with markdown now and then; the exported line
+// pattern documents the tolerated drift (wrappers, punctuation, casing).
+test('recognizes the reveal line through markdown wrappers', () => {
+  assert.match('**Requesting access to know [PHONE_1_zz99qq] from Cloak.**', REVEAL_LINE_PATTERN);
+  assert.match('requesting access to know [PHONE_1_zz99qq] from cloak', REVEAL_LINE_PATTERN);
+  assert.equal(REVEAL_LINE_PATTERN.test('Requesting access to know more about that'), false);
+
+  // The scanner strips the decorated form whole and reports the token.
+  const reported = [];
+  const scanner = createRevealScanner((captured) => reported.push(captured));
+  const delivered = scanner.feed('**Requesting access to know [PHONE_1_zz99qq] from Cloak.**', false);
+  assert.deepEqual(reported, ['[PHONE_1_zz99qq]']);
+  assert.equal(delivered, ''); // the line was the entire message
+});
+
+// Post-restoration form: response text is restored BEFORE the scanner runs,
+// so the capture carries the clear value ("know <real email> from Cloak").
+// The scanner reports the capture as-is — install()'s handler maps it back
+// to its token via masker.tokenFor (covered by the XHR integration test).
+test('reports the restored value form of a reveal line', () => {
+  const reported = [];
+  const scanner = createRevealScanner((captured) => reported.push(captured));
+  const delivered = scanner.feed('Hi — Requesting access to know lucalogix12@gmail.com from Cloak — bye', false);
+
+  assert.deepEqual(reported, ['lucalogix12@gmail.com']);
+  assert.equal(delivered.includes('lucalogix12@gmail.com'), false);
+  assert.match(delivered, /Hi/);
+  assert.match(delivered, /bye/);
+});
+
+// Append-only, zero-lag contract: ordinary stream text must pass through
+// immediately (Gemini's reader tracks offsets — a committed prefix can never
+// be retracted), and nothing may fire without the magic sentence.
+test('streams ordinary reply text immediately and append-only', () => {
+  const reported = [];
+  const scanner = createRevealScanner(() => reported.push('fire'));
+
+  const first = scanner.feed('Hello there — here is ', false);
+  assert.equal(first, 'Hello there — here is ');
+  const second = scanner.feed('a plain continuation.', false);
+  assert.equal(second, 'Hello there — here is a plain continuation.');
+  const third = scanner.feed(' All done.', true);
+  assert.equal(third, 'Hello there — here is a plain continuation. All done.');
+  assert.equal(reported.length, 0);
+});
+
+// The core hold rule: a chunk ENDING mid-sentence must wait for its tail
+// (the split lands across network chunks all the time), then resolve —
+// fire once, strip the whole line, ship everything else.
+test('holds a partial reveal sentence across chunks until it completes', () => {
+  const reported = [];
+  const scanner = createRevealScanner((captured) => reported.push(captured));
+
+  // Chunk 1: the intro line has a newline → final, ships; the sentence
+  // fragment has none and builds the magic head → held, not delivered.
+  const first = scanner.feed('Sure!\nRequesting acc', false);
+  assert.equal(first, 'Sure!\n');
+  assert.deepEqual(reported, []);
+
+  // Chunk 2 completes the sentence → reported + removed; remainder ships.
+  const second = scanner.feed('ess to know [EMAIL_1_ab12cd] from Cloak\nok', false);
+  assert.deepEqual(reported, ['[EMAIL_1_ab12cd]']);
+  assert.equal(second, 'Sure!\n\nok');
+  assert.equal(second.includes('Requesting'), false);
+  assert.equal(second.includes('[EMAIL_1_ab12cd]'), false);
+});
+
+// The hold rule must never stall legitimate prose that merely LOOKS like the
+// start of the reveal line. The newline proves the line was abandoned → it
+// ships verbatim, nothing fires, and even an unfinished stream (no DONE yet)
+// unblocks as soon as that newline arrives.
+test('does not stall on prose that starts like the reveal line', () => {
+  const reported = [];
+  const scanner = createRevealScanner(() => reported.push('fire'));
+
+  // No newline after the lookalike yet → held (it could still become real).
+  const first = scanner.feed('I would like.\nRequesting access to know more', false);
+  assert.equal(first, 'I would like.\n');
+
+  // The newline settles it: prose, not a reveal → ships whole, zero fires.
+  const second = scanner.feed(' details.\nDone!\n', false);
+  assert.equal(second, 'I would like.\nRequesting access to know more details.\nDone!\n');
+  assert.deepEqual(reported, []);
+});
+
+// Consent gate on the masker: after the user clicks Share, THAT value
+// travels in clear text on follow-up requests (so Gemini can actually act
+// on it), while everything else keeps masking — and the shared value does
+// not inflate the per-request "masked values" stat.
+test('lets consented values pass through in clear text', () => {
+  const masker = createMasker();
+  const first = masker.maskText('Email lucalogix12@gmail.com today');
+  const token = first.match(/\[EMAIL_[^\]]+\]/)[0];
+  assert.equal(first.includes('lucalogix12@gmail.com'), false);
+  assert.equal(masker.takeMaskedCount(), 1);
+
+  masker.grantConsent(token);
+
+  const followUp = masker.maskText('Email lucalogix12@gmail.com or call 415-555-0199');
+  assert.equal(followUp.includes('lucalogix12@gmail.com'), true); // shared → clear
+  assert.match(followUp, /\[PHONE_[^\]]+\]/); // everything else still masks
+  assert.equal(followUp.includes('415-555-0199'), false);
+  assert.equal(masker.takeMaskedCount(), 1); // consented pass is not counted
+  assert.equal(masker.tokenFor('lucalogix12@gmail.com'), token); // reverse lookup
+
+  // Consent for an unknown token is ignored (no throw, no stray pass-through).
+  masker.grantConsent('[EMAIL_9_unknown-token]');
+  assert.equal(masker.maskText('Email lucalogix12@gmail.com again').includes('[EMAIL_'), false);
+});
+
+// End-to-end through the shipped bundle: the model replies with the magic
+// line (token form — it only ever saw placeholders). The RPC path restores
+// the token to its value FIRST, then the frame strip finds the sentence in
+// the decoded protobuf prose, maps the value back to its token, removes the
+// line from the bytes the page receives, and posts the consent request.
+test('XHR strips the reveal line from RPC frames and posts a consent request', () => {
+  const listeners = new Map();
+  const messages = [];
+  class MockXHR {
+    constructor() {
+      this.headers = {};
+      this.responseType = '';
+      this.status = 200;
+      this.readyState = 2; // LOADING — the long-poll is still open
+      this._responseText = '';
+    }
+    open(method, url) {
+      this.method = method;
+      this.url = url;
+    }
+    setRequestHeader(name, value) {
+      this.headers[name.toLowerCase()] = value;
+    }
+    send(body) {
+      this.sentBody = body;
+      const params = new URLSearchParams(body);
+      const text = Buffer.from(params.get('req1___data__'), 'base64').toString('utf8');
+      this.mintedTokens = text.match(/\[(?:PERSON|PHONE|EMAIL)_[^\]]+\]/g) || [];
+      this._responseText = '';
+    }
+  }
+  Object.defineProperty(MockXHR.prototype, 'responseText', {
+    configurable: true,
+    get() { return this._responseText; }
+  });
+  Object.defineProperty(MockXHR.prototype, 'response', {
+    configurable: true,
+    get() { return this._responseText; }
+  });
+
+  const pageWindow = {
+    location: {
+      href: 'https://gemini.google.com/app',
+      origin: 'https://gemini.google.com',
+      hostname: 'gemini.google.com'
+    },
+    XMLHttpRequest: MockXHR,
+    URL,
+    URLSearchParams,
+    Headers,
+    Request,
+    Response,
+    TransformStream,
+    console: { info() {}, warn() {} },
+    addEventListener: (type, listener) => listeners.set(type, listener),
+    postMessage: (message) => messages.push(message),
+    fetch: async () => new Response('ok')
+  };
+  const source = fs.readFileSync(require.resolve('../intercept.bundle.js'), 'utf8');
+  vm.runInNewContext(source, {
+    require,
+    window: pageWindow,
+    URL,
+    URLSearchParams,
+    Headers,
+    Request,
+    Response,
+    TransformStream,
+    TextEncoder,
+    TextDecoder,
+    atob: (value) => Buffer.from(value, 'base64').toString('binary'),
+    btoa: (value) => Buffer.from(value, 'binary').toString('base64')
+  });
+  listeners.get('message')({
+    source: pageWindow,
+    origin: pageWindow.location.origin,
+    data: { type: 'CLOAK_CONFIG', enabled: true, settings: {} }
+  });
+
+  // Turn 1: PII goes out tokenized, and the reveal notice rides along.
+  const prompt = 'my name is bob and my phone number is 919-123-4567';
+  const xhr = new pageWindow.XMLHttpRequest();
+  xhr.open('POST', 'https://geminiweb-pa.clients6.google.com/v1/processSession');
+  xhr.send(new URLSearchParams({
+    count: '2',
+    ofs: '0',
+    req0___data__: Buffer.from(buildSessionPart()).toString('base64'),
+    req1___data__: Buffer.from(buildUserPart(prompt)).toString('base64')
+  }).toString());
+
+  const personToken = xhr.mintedTokens.find((token) => token.startsWith('[PERSON')) || '';
+  assert.ok(personToken, 'prompt must mint a person token');
+  const sentText = Buffer.from(new URLSearchParams(xhr.sentBody).get('req1___data__'), 'base64').toString('utf8');
+  assert.equal(sentText.includes('[Cloak privacy notice]'), true);
+
+  // The model follows the instruction and replies with the magic line
+  // (token form — placeholders are all it knows). Restoration will swap the
+  // token for "bob" before the strip runs, exercising the value-form
+  // capture + tokenFor() mapping. The "S" first byte makes the decoded text
+  // fail strict protobuf parsing (group wire-type), so it takes the prose
+  // path deterministically — same trick as the existing reply-frame test.
+  const replyProto = encStringField(1, `Sure — done.\nRequesting access to know ${personToken} from Cloak\nAnything else?`);
+  const replyJson = JSON.stringify([[0, ['c', Buffer.from(replyProto).toString('base64'), '', 8, 15, 30000]]]);
+  const frame = `${Buffer.byteLength(replyJson, 'utf8')}\n${replyJson}`;
+
+  const reads = [];
+  const read = () => {
+    const text = xhr.responseText;
+    reads.push(text);
+    return text;
+  };
+
+  // Progress 1: half a frame arrives — held (incomplete), nothing fires.
+  xhr._responseText = frame.slice(0, Math.floor(frame.length / 2));
+  assert.equal(read(), '');
+
+  // Progress 2: the frame completes — restored AND stripped.
+  xhr._responseText = frame;
+  const delivered = read();
+  const newline = delivered.indexOf('\n');
+  const deliveredJson = delivered.slice(newline + 1);
+  assert.equal(Number(delivered.slice(0, newline)), Buffer.byteLength(deliveredJson, 'utf8'), 'length prefix must match the re-encoded frame');
+  const deliveredText = Buffer.from(JSON.parse(deliveredJson)[0][1][1], 'base64').toString('utf8');
+  // The page receives the reply prose minus the reveal line entirely.
+  assert.equal(deliveredText.includes('Requesting access to know'), false);
+  assert.equal(deliveredText.includes(personToken), false);
+  assert.equal(deliveredText.includes('bob'), false); // only lived inside the hidden line
+  assert.match(deliveredText, /done/);
+  assert.match(deliveredText, /Anything else\?/);
+
+  // The consent request reached the content script with the token AND the
+  // human-readable value (the dialog shows the user what would be shared).
+  const reveal = messages.find(({ type }) => type === 'CLOAK_REVEAL_REQUEST');
+  assert.ok(reveal, 'reveal request must be posted');
+  assert.equal(reveal.token, personToken);
+  assert.equal(reveal.original, 'bob');
+
+  // Append-only: every read is a prefix of the next (nothing already
+  // delivered is ever retracted or rewritten).
+  for (let i = 1; i < reads.length; i += 1) {
+    assert.equal(reads[i].startsWith(reads[i - 1]), true, `read ${i} changed already-delivered text`);
+  }
 });
