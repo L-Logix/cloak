@@ -1,14 +1,35 @@
 <!doctype html>
+<!--
+  Cloak — extension popup (popup.html)
+
+  This is the user-facing control panel: a fixed 380×560 shell with a header,
+  a five-to-six page stage switched by the bottom nav, and the nav itself.
+
+  Pages
+    home     master toggle, live site status, activity odometers
+    try      live masking demo — runs the real engine locally, saves nothing
+    vault    token → value table with search, reveal, export, clear
+    coverage per-category detection toggles (names/emails/phones/addresses)
+    terms    personal dictionary of extra words to mask
+    settings reply restoration, badge, supported sites, counters reset
+
+  Scripts load in order: intercept.bundle.js exposes window.CloakPreview
+  (see the bottom of intercept.js), then popup.js wires every interaction.
+-->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cloak</title>
   <link rel="stylesheet" href="styles.css">
+  <!-- Same bundle the chat pages load; in extension pages it only exposes
+       CloakPreview (it never hooks this popup's fetch/XHR). -->
+  <script src="intercept.bundle.js" defer></script>
   <script src="popup.js" defer></script>
 </head>
 <body class="popup-body">
   <main class="popup-shell">
+    <!-- Brand header: shield mark + the "ON DEVICE" trust badge. -->
     <header class="popup-header">
       <div class="brand" aria-label="Cloak">
         <span class="brand-mark" aria-hidden="true">
@@ -22,34 +43,97 @@
       <span class="local-tag"><span class="local-dot"></span>ON DEVICE</span>
     </header>
 
+    <!-- Every page lives here at once; popup.js un/hidden them via the nav. -->
     <div class="page-stage">
+
+      <!-- ================= HOME ================= -->
       <section class="page-view home-view" data-page-view="home" aria-labelledby="home-heading">
-        <div class="home-copy">
-          <p class="eyebrow">YOUR PRIVATE AI LAYER</p>
-          <h1 id="home-heading">Your words.<br><span>Your control.</span></h1>
-          <p class="home-description" id="protection-detail">Checking protection status...</p>
+        <!-- Master switch: one button controls every page's interception. -->
+        <div class="power-row">
+          <button class="power-control" id="master-toggle" type="button" role="switch" aria-checked="true" aria-label="Cloak protection" aria-describedby="protection-detail">
+            <svg viewBox="0 0 32 32" focusable="false">
+              <path d="M16 4v12" />
+              <path d="M9.2 8.2a12 12 0 1 0 13.6 0" />
+            </svg>
+          </button>
+          <span class="power-copy">
+            <strong id="power-label">Protection on</strong>
+            <small id="protection-detail">Sensitive values are checked locally.</small>
+          </span>
         </div>
+
+        <!-- Live status of the currently focused tab (protected / idle / off). -->
         <div class="home-status" id="site-status" data-active="false" role="status" aria-live="polite">
           <span class="status-light" aria-hidden="true"></span>
           <span class="status-copy">
             <strong id="status-label">Checking site</strong>
             <small id="status-caption">One moment</small>
           </span>
-          <span class="site-mark" aria-hidden="true">AI</span>
+          <span class="site-mark" id="site-mark" aria-hidden="true">AI</span>
         </div>
-        <button class="power-control" id="master-toggle" type="button" role="switch" aria-checked="true" aria-label="Cloak protection" aria-describedby="protection-detail">
-          <span class="power-ring" aria-hidden="true">
-            <svg viewBox="0 0 32 32" focusable="false">
-              <path d="M16 4v12" />
-              <path d="M9.2 8.2a12 12 0 1 0 13.6 0" />
-            </svg>
-          </span>
-          <span class="power-label" id="power-label">CLOAK ON</span>
-          <span class="power-hint">Tap to pause protection</span>
-        </button>
-        <p class="home-footnote"><span aria-hidden="true">◆</span> Your private details stay on this device</p>
+
+        <!-- Lifetime activity counters, stored locally and rendered as an
+             odometer so changes roll instead of jump. -->
+        <section class="activity-section" aria-labelledby="home-heading">
+          <div class="activity-heading">
+            <div>
+              <p class="eyebrow">THIS BROWSER</p>
+              <h1 id="home-heading">Privacy activity</h1>
+            </div>
+            <span class="local-label"><span class="local-dot" aria-hidden="true"></span>LOCAL</span>
+          </div>
+          <div class="activity-metrics">
+            <div class="activity-metric">
+              <p>Values masked</p>
+              <div class="odometer" id="values-masked" aria-label="0">0</div>
+              <small>Details replaced before send</small>
+            </div>
+            <div class="activity-metric">
+              <p>Requests checked</p>
+              <div class="odometer" id="requests-checked" aria-label="0">0</div>
+              <small>Supported chat submissions</small>
+            </div>
+          </div>
+          <!-- Honest limitation, shown permanently: detection is best-effort. -->
+          <p class="activity-disclaimer">Pattern detection can miss details. Review prompts before sending.</p>
+        </section>
       </section>
 
+      <!-- ================= TRY (live demo) ================= -->
+      <!-- Runs the real masking engine (intercept.bundle.js) inside this
+           popup. Nothing typed here is stored or sent anywhere: the masker
+           instance lives only for the lifetime of the page. -->
+      <section class="page-view try-view" data-page-view="try" aria-labelledby="try-heading" hidden>
+        <div class="page-title-row">
+          <div>
+            <p class="eyebrow">LIVE DEMO</p>
+            <h1 id="try-heading">Try it</h1>
+          </div>
+          <span class="page-meta" id="try-count">0 masked</span>
+        </div>
+        <p class="page-description">Paste any text to see exactly what would leave your device.</p>
+
+        <label class="try-field">
+          <span class="sr-only">Text to mask</span>
+          <textarea id="try-input" rows="4" autocomplete="off" spellcheck="false" placeholder="Hi, my name is Bob Carter. You can reach me at bob.carter@example.com or 919-123-4567."></textarea>
+        </label>
+        <div class="try-toolbar">
+          <button class="text-action" id="try-example" type="button">Load example</button>
+          <button class="text-action" id="try-clear" type="button">Clear</button>
+        </div>
+
+        <div class="try-output-block">
+          <p class="try-label">SENT TO THE AI <span>(masked)</span></p>
+          <pre class="try-output" id="try-output" aria-live="polite">Type or paste above to preview masking.</pre>
+        </div>
+
+        <!-- One chip per category that fired, with its hit count. -->
+        <div class="try-chips" id="try-chips" aria-live="polite"></div>
+
+        <p class="settings-note"><span class="local-dot" aria-hidden="true"></span>Same engine as the page hook. Preview is never saved.</p>
+      </section>
+
+      <!-- ================= VAULT ================= -->
       <section class="page-view vault-view" data-page-view="vault" aria-labelledby="vault-heading" hidden>
         <div class="page-title-row">
           <div>
@@ -59,32 +143,51 @@
           <span class="vault-count" id="vault-count">0</span>
         </div>
         <p class="page-description">Masked values are kept here so Cloak can restore your replies.</p>
+        <!-- Search filters rows client-side; no indexing, no storage. -->
+        <label class="vault-search">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m12.5 12.5 4 4"/></svg>
+          <input id="vault-search" type="search" placeholder="Find a token or value" autocomplete="off" spellcheck="false" aria-label="Search vault entries">
+        </label>
+        <!-- Rows are built by popup.js; the child below is the empty state. -->
         <div class="vault-list" id="vault-list" aria-live="polite">
           <p class="empty-vault">Nothing masked yet. Your tokens will appear here.</p>
         </div>
         <div class="vault-actions">
           <p class="vault-message" id="vault-message" aria-live="polite"></p>
-          <button class="clear-button" id="clear-vault" type="button" disabled>
-            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-              <path d="M4 6h12M8 6V4h4v2m-6 0 .7 10h6.6L14 6M8.5 9v4m3-4v4" />
-            </svg>
-            <span>Clear vault</span>
-          </button>
+          <div class="vault-buttons">
+            <!-- Export downloads the vault as JSON for backup or audit. -->
+            <button class="clear-button" id="export-vault" type="button" disabled>
+              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path d="M10 3v9m0 0 3.2-3.2M10 12 6.8 8.8M4 14.5v1A1.5 1.5 0 0 0 5.5 17h9a1.5 1.5 0 0 0 1.5-1.5v-1" />
+              </svg>
+              <span>Export</span>
+            </button>
+            <!-- Clear vault is destructive, so it stays disabled when empty. -->
+            <button class="clear-button" id="clear-vault" type="button" disabled>
+              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path d="M4 6h12M8 6V4h4v2m-6 0 .7 10h6.6L14 6M8.5 9v4m3-4v4" />
+              </svg>
+              <span>Clear vault</span>
+            </button>
+          </div>
         </div>
       </section>
 
-      <section class="page-view settings-view" data-page-view="settings" aria-labelledby="settings-heading" hidden>
+      <!-- ================= COVERAGE ================= -->
+      <!-- Category switches feed the masker through CLOAK_CONFIG; turning one
+           off takes effect on the very next request. -->
+      <section class="page-view coverage-view" data-page-view="coverage" aria-labelledby="coverage-heading" hidden>
         <div class="page-title-row">
           <div>
-            <p class="eyebrow">MAKE IT YOURS</p>
-            <h1 id="settings-heading">Settings</h1>
+            <p class="eyebrow">DETECTION CATEGORIES</p>
+            <h1 id="coverage-heading">Coverage</h1>
           </div>
-          <span class="settings-gear" aria-hidden="true">⚙</span>
+          <span class="coverage-total" id="coverage-total">4 active</span>
         </div>
-        <p class="page-description">Choose which details Cloak should keep private.</p>
-        <div class="settings-list">
+        <p class="page-description">Choose the patterns Cloak checks before a prompt leaves your device.</p>
+        <div class="settings-list coverage-list">
           <label class="setting-row" for="setting-names">
-            <span><strong>Names</strong><small>Introduced names and people</small></span>
+            <span><strong>Names</strong><small>Introductions and titles</small></span>
             <input id="setting-names" type="checkbox" data-setting="names" checked>
           </label>
           <label class="setting-row" for="setting-emails">
@@ -95,19 +198,92 @@
             <span><strong>Phone numbers</strong><small>Common US number formats</small></span>
             <input id="setting-phones" type="checkbox" data-setting="phones" checked>
           </label>
+          <label class="setting-row" for="setting-addresses">
+            <span><strong>Street addresses</strong><small>Common US street formats</small></span>
+            <input id="setting-addresses" type="checkbox" data-setting="addresses" checked>
+          </label>
         </div>
-        <p class="settings-note"><span class="local-dot" aria-hidden="true"></span>Detection and restoration happen locally.</p>
+        <p class="settings-note"><span class="local-dot" aria-hidden="true"></span>Local patterns are useful, not perfect recognition.</p>
+      </section>
+
+      <!-- ================= CUSTOM TERMS ================= -->
+      <section class="page-view terms-view" data-page-view="terms" aria-labelledby="terms-heading" hidden>
+        <div class="page-title-row">
+          <div>
+            <p class="eyebrow">PERSONAL DICTIONARY</p>
+            <h1 id="terms-heading">Custom terms</h1>
+          </div>
+          <span class="terms-total" id="terms-total">0 saved</span>
+        </div>
+        <p class="page-description">Add names, project codenames, or phrases you want Cloak to replace in prompts.</p>
+        <form class="term-form" id="custom-term-form">
+          <label class="sr-only" for="custom-term-input">Term to mask</label>
+          <input id="custom-term-input" type="text" maxlength="80" autocomplete="off" placeholder="Add a private term">
+          <button type="submit" aria-label="Add custom term">Add</button>
+        </form>
+        <!-- Live region announces save/remove results to screen readers. -->
+        <p class="term-feedback" id="term-feedback" aria-live="polite"></p>
+        <ul class="custom-term-list" id="custom-term-list" aria-label="Saved custom terms"></ul>
+        <p class="settings-note"><span class="local-dot" aria-hidden="true"></span>Terms stay in this browser.</p>
+      </section>
+
+      <!-- ================= SETTINGS ================= -->
+      <section class="page-view settings-view" data-page-view="settings" aria-labelledby="settings-heading" hidden>
+        <div class="page-title-row">
+          <div>
+            <p class="eyebrow">PERSONAL PREFERENCES</p>
+            <h1 id="settings-heading">Settings</h1>
+          </div>
+          <span class="page-meta">LOCAL</span>
+        </div>
+        <div class="settings-list preference-list">
+          <label class="setting-row" for="setting-restore">
+            <span><strong>Restore replies</strong><small>Replace Cloak tokens with originals</small></span>
+            <input id="setting-restore" type="checkbox" data-setting="restoreResponses" checked>
+          </label>
+          <label class="setting-row" for="setting-badge">
+            <span><strong>Composer badge</strong><small>Show Cloak status by the chat box</small></span>
+            <input id="setting-badge" type="checkbox" data-setting="showBadge" checked>
+          </label>
+        </div>
+        <div class="supported-sites">
+          <p class="eyebrow">SUPPORTED CHATS</p>
+          <div><span class="site-dot" aria-hidden="true"></span>ChatGPT<span>SUPPORTED</span></div>
+          <div><span class="site-dot" aria-hidden="true"></span>Gemini<span>SUPPORTED</span></div>
+          <div><span class="site-dot" aria-hidden="true"></span>Claude<span>SUPPORTED</span></div>
+        </div>
+        <!-- Counter reset lives on its own row so it is never mixed with the
+             category switches (accidental resets are worse than extra clicks). -->
+        <div class="settings-action-row">
+          <span><strong>Activity totals</strong><small>Reset local dashboard counters</small></span>
+          <button id="reset-activity" class="text-action" type="button">Reset</button>
+        </div>
+        <p class="settings-note"><span class="local-dot" aria-hidden="true"></span>Your vault stays in this browser.</p>
       </section>
     </div>
 
+    <!-- Bottom navigation: one button per page-view above. popup.js keeps the
+         active state and aria-current in sync when a button is pressed. -->
     <nav class="bottom-nav" aria-label="Main navigation">
       <button class="nav-item is-active" type="button" data-page-target="home" aria-current="page">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m3 9 7-6 7 6v8h-5v-5H8v5H3z" /></svg>
         <span>Home</span>
       </button>
+      <button class="nav-item" type="button" data-page-target="try">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m3 17 8.5-8.5" /><path d="m12.4 3.2.5 1.7 1.7.5-1.7.5-.5 1.7-.5-1.7-1.7-.5 1.7-.5z" /><path d="M16 11v3M14.5 12.5h3" /></svg>
+        <span>Try</span>
+      </button>
       <button class="nav-item" type="button" data-page-target="vault">
         <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="5" width="14" height="12" rx="2" /><path d="M6 5V4a4 4 0 0 1 8 0v1m-4 5v3" /></svg>
         <span>Vault</span>
+      </button>
+      <button class="nav-item" type="button" data-page-target="coverage">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 16 5v5c0 3.4-2.2 5.9-6 7.5C6.2 15.9 4 13.4 4 10V5z"/><path d="m7 10 2 2 4-4"/></svg>
+        <span>Coverage</span>
+      </button>
+      <button class="nav-item" type="button" data-page-target="terms">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4.5h14v11H3z"/><path d="M6 8h8M6 11h5"/></svg>
+        <span>Terms</span>
       </button>
       <button class="nav-item" type="button" data-page-target="settings">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 2.8h4l.6 2a6 6 0 0 1 1.1.6l2-.6 2 3.4-1.5 1.6a6 6 0 0 1 0 1.3l1.5 1.6-2 3.4-2-.6a6 6 0 0 1-1.1.6l-.6 2H8l-.6-2a6 6 0 0 1-1.1-.6l-2 .6-2-3.4 1.5-1.6a6 6 0 0 1 0-1.3L2.3 8.2l2-3.4 2 .6a6 6 0 0 1 1.1-.6z" /><circle cx="10" cy="10.5" r="2.2" /></svg>
