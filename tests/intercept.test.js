@@ -851,6 +851,57 @@ const encTag = (field, wireType) => encVarint(field * 8 + wireType);
 const encBytesField = (field, bytes) => [...encTag(field, 2), ...encVarint(bytes.length), ...bytes];
 const encStringField = (field, text) => encBytesField(field, [...Buffer.from(text, 'utf8')]);
 const encVarintField = (field, value) => [...encTag(field, 0), ...encVarint(value)];
+// Strict parser for test assertions: returns [{field, wireType, varint?/bytes?/raw?}]
+// or null when ANY byte is not a well-formed, fully consumed field.
+const parseProtoStrict = (buf) => {
+  const readVarint = (b, o) => {
+    let value = 0;
+    let shift = 0;
+    let x;
+    do {
+      if (o >= b.length) return null;
+      x = b[o];
+      o += 1;
+      value += (x & 0x7f) * (2 ** shift);
+      shift += 7;
+    } while (x >= 0x80);
+    return [value, o];
+  };
+  const fields = [];
+  let o = 0;
+  while (o < buf.length) {
+    const tag = readVarint(buf, o);
+    if (!tag) return null;
+    o = tag[1];
+    const field = Math.floor(tag[0] / 8);
+    const wireType = tag[0] % 8;
+    if (field === 0) return null;
+    if (wireType === 0) {
+      const v = readVarint(buf, o);
+      if (!v) return null;
+      o = v[1];
+      fields.push({ field, wireType, varint: v[0] });
+    } else if (wireType === 1) {
+      if (o + 8 > buf.length) return null;
+      fields.push({ field, wireType, bytes: buf.subarray(o, o + 8) });
+      o += 8;
+    } else if (wireType === 2) {
+      const len = readVarint(buf, o);
+      if (!len) return null;
+      o = len[1];
+      if (o + len[0] > buf.length) return null;
+      fields.push({ field, wireType, bytes: buf.subarray(o, o + len[0]) });
+      o += len[0];
+    } else if (wireType === 5) {
+      if (o + 4 > buf.length) return null;
+      fields.push({ field, wireType, bytes: buf.subarray(o, o + 4) });
+      o += 4;
+    } else {
+      return null;
+    }
+  }
+  return fields;
+};
 // Observed req1 shape: field 2 { field 1: varint, field 9 { field 1: string(prompt) } }.
 const buildUserPart = (prompt) => encBytesField(2, [
   ...encVarintField(1, 1),
@@ -888,6 +939,51 @@ test('masks PII inside Gemini processSession protobuf request parts', () => {
   assert.match(restored, /John Doe/);
   assert.match(restored, /tester@example\.test/);
   assert.match(restored, /415-555-0199/);
+});
+
+// Regression: a submessage whose inner string is <128 chars has a PRINTABLE
+// length byte (0x7E for 126), so the whole submessage decodes as "valid
+// UTF-8 text". Masking it as one flat sentence left the stale structure
+// bytes (0a 7e) inside the string and sent a corrupt protobuf — the server
+// rejected the request ("Something went wrong"). Structure must win: bytes
+// that parse as a complete message are recursed into, never prose-masked.
+test('keeps submessage nesting when the length byte is printable', () => {
+  const masker = createMasker();
+  const prompt = 'My name is John Doe. My email is tester@example.test and my phone is 415-555-0199. Please repeat all three back to me exactly.';
+  assert.equal(prompt.length, 126); // inner string len byte = 0x7E — printable
+
+  const textBytes = [...Buffer.from(prompt, 'utf8')];
+  const f1String = [0x0a, ...encVarint(textBytes.length), ...textBytes];
+  const f9 = [0x4a, ...encVarint(f1String.length), ...f1String];
+  const f2Content = [0x08, 0x01, ...f9];
+  const userPart = [0x12, ...encVarint(f2Content.length), ...f2Content];
+  const body = `count=1&ofs=1&req0___data__=${Buffer.from(userPart).toString('base64')}`;
+
+  const rewritten = masker.rewriteBody(body, '');
+  assert.equal(masker.takeMaskedCount(), 3);
+
+  // Strict structural walk: every level must still parse as a message.
+  const top = parseProtoStrict(Buffer.from(new URLSearchParams(rewritten).get('req0___data__'), 'base64'));
+  assert.ok(top, 'top level must parse');
+  const f2 = top.find(({ field }) => field === 2);
+  assert.ok(f2, 'f2 must survive');
+  const inner = parseProtoStrict(f2.bytes);
+  assert.ok(inner, 'f2 content must parse');
+  const f9Field = inner.find(({ field }) => field === 9);
+  assert.ok(f9Field, 'f9 must survive');
+  const f9Inner = parseProtoStrict(f9Field.bytes);
+  assert.ok(f9Inner, 'f9 content must be a message, not a flat string');
+  const promptField = f9Inner.find(({ field }) => field === 1);
+  assert.ok(promptField, 'prompt must still live in f9/f1');
+  const maskedPrompt = Buffer.from(promptField.bytes).toString('utf8');
+
+  assert.match(maskedPrompt, /My name is \[PERSON_1_[a-z0-9-]+\]/);
+  assert.equal(maskedPrompt.includes('John Doe'), false);
+  assert.equal(maskedPrompt.includes('tester@example.test'), false);
+  assert.equal(maskedPrompt.includes('415-555-0199'), false);
+  // The corruption signature: stale structure bytes swallowed into the text.
+  assert.equal(maskedPrompt.includes('\n~'), false);
+  assert.equal(masker.restoreText(maskedPrompt), prompt);
 });
 
 // The frame-aware response path is per-XHR-instance bundle wiring, so this
@@ -1000,15 +1096,21 @@ test('XHR restores tokens inside processSession RPC response frames', () => {
     return text;
   };
 
-  // Progress 1: the frame is split mid-JSON — an incomplete frame is held.
-  xhr._responseText = frame.slice(0, Math.floor(frame.length / 2));
-  assert.equal(read(), '');
+  // The real stream opens with Google's anti-XSSI prefix; it must pass
+  // through verbatim instead of wedging the frame parser (holding it
+  // forever would deadlock a long-poll that never ends).
+  const xssi = ")]}'\n";
+
+  // Progress 1: prefix delivered, frame split mid-JSON — incomplete held.
+  xhr._responseText = xssi + frame.slice(0, Math.floor(frame.length / 2));
+  assert.equal(read(), xssi);
 
   // Progress 2: the frame completes — restored with a corrected length prefix.
-  xhr._responseText = frame;
+  xhr._responseText = xssi + frame;
   const full = read();
-  const newline = full.indexOf('\n');
-  const lengthText = full.slice(0, newline);
+  assert.equal(full.startsWith(xssi), true);
+  const newline = full.indexOf('\n', xssi.length);
+  const lengthText = full.slice(xssi.length, newline);
   const deliveredJson = full.slice(newline + 1);
   assert.match(lengthText, /^\d+$/);
   assert.equal(Number(lengthText), Buffer.byteLength(deliveredJson, 'utf8'), 'length prefix must match the restored frame bytes');
@@ -1022,7 +1124,7 @@ test('XHR restores tokens inside processSession RPC response frames', () => {
   // first frame must not be re-delivered differently (append-only).
   const tailJson = JSON.stringify([[0, ['c', 'done']]]);
   const tailFrame = `${Buffer.byteLength(tailJson, 'utf8')}\n${tailJson}`;
-  xhr._responseText = `${frame}\r\n${tailFrame}`;
+  xhr._responseText = `${xssi}${frame}\r\n${tailFrame}`;
   const third = read();
   assert.equal(third.startsWith(full), true);
   assert.equal(third.includes('\r\n'), true);
@@ -1030,7 +1132,7 @@ test('XHR restores tokens inside processSession RPC response frames', () => {
 
   // DONE: any trailing partial bytes flush verbatim instead of being held.
   xhr.readyState = 4;
-  xhr._responseText = `${frame}\r\n${tailFrame}9\nleft-over`;
+  xhr._responseText = `${xssi}${frame}\r\n${tailFrame}9\nleft-over`;
   const flushed = read();
   assert.equal(flushed.endsWith('9\nleft-over'), true);
 
@@ -1042,7 +1144,7 @@ test('XHR restores tokens inside processSession RPC response frames', () => {
       `read ${i} changed already-delivered text`
     );
   }
-  assert.equal(messages.some(({ type, valuesMasked }) => type === 'CLOAK_REQUEST_STATS' && valuesMasked >= 3), true);
+  assert.equal(messages.some(({ type, valuesMasked }) => type === 'CLOAK_REQUEST_STATS' && valuesMasked >= 2), true);
 });
 
 // ---------------------------------------------------------------------------

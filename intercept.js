@@ -671,6 +671,22 @@ const parseAddress = require('addressit'); // local street-address parser
         out.push(entry);
         continue;
       }
+      // Structure beats text: a field whose bytes parse as a COMPLETE
+      // message is a submessage and must be recursed into — even when it
+      // also decodes as text. A submessage with a printable length byte
+      // (e.g. 0x7E for a 126-char string) is valid UTF-8; masking it as one
+      // flat sentence would leave the stale structure bytes in place and
+      // corrupt the message (the server then rejects the request).
+      if (parseProtobuf(entry.bytes)?.length) {
+        const nested = mapProtobufProse(entry.bytes, mapText);
+        if (nested.changed) {
+          changed = true;
+          out.push({ field: entry.field, wireType: 2, bytes: nested.bytes });
+        } else {
+          out.push(entry);
+        }
+        continue;
+      }
       let text = null;
       try {
         text = protoTextDecoder.decode(entry.bytes);
@@ -686,13 +702,7 @@ const parseAddress = require('addressit'); // local street-address parser
           out.push(entry);
         }
       } else {
-        const nested = mapProtobufProse(entry.bytes, mapText);
-        if (nested.changed) {
-          changed = true;
-          out.push({ field: entry.field, wireType: 2, bytes: nested.bytes });
-        } else {
-          out.push(entry); // nested parse failed or nothing matched — verbatim
-        }
+        out.push(entry);
       }
     }
     return changed ? { bytes: serializeProtobuf(out), changed: true } : { bytes, changed: false };
@@ -1017,11 +1027,12 @@ const parseAddress = require('addressit'); // local street-address parser
             }
             const lengthText = raw.slice(position, newline);
             if (!/^\d{1,8}$/.test(lengthText)) {
-              if (transferFinished) {
-                out += raw.slice(position);
-                position = raw.length;
-              }
-              break;
+              // Not a length line (anti-XSSI ")]}'" prefix, stray bytes):
+              // pass it through verbatim. Holding it would deadlock a
+              // long-poll whose first bytes are never a frame.
+              out += `${lengthText}\n`;
+              position = newline + 1;
+              continue;
             }
             const frameLength = Number(lengthText);
             const frameStart = newline + 1;
