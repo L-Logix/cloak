@@ -1,16 +1,8 @@
 /* ---------------------------------------------------------------------------
-   Cloak — injected page styles (content.css)
-
-   These two elements are appended to the chat page itself (never the popup):
-
-     .cloak-mask-badge     a small lock pinned to the composer's corner
-     .cloak-media-banner   a toast explaining why image prompts skip masking
-
-   Both are position:fixed at the very top of the stacking context
-   (z-index ~2^31) so site styles cannot bury them, and both are
-   pointer-events:none so they never intercept a click meant for the site.
-   Colours are hard-coded (not tokens) because this stylesheet runs in the
-   page's origin, where our design tokens do not exist.
+   Cloak — page-injected styles: .cloak-mask-badge (composer corner lock) and
+   .cloak-media-banner (media-bypass toast). position:fixed above site
+   content, pointer-events:none, hard-coded colours — the page origin has no
+   access to the popup's design tokens.
 --------------------------------------------------------------------------- */
 
 /* ---------- composer badge ---------- */
@@ -22,8 +14,7 @@
   width: 25px;
   height: 25px;
   place-items: center;
-  /* Muted sage palette chosen to sit quietly inside both light and dark
-     chat themes; opacity .82 keeps it from shouting. */
+  /* Muted sage sits quietly in light and dark themes; opacity .82 keeps it subtle. */
   border: 1px solid #aab4ad;
   border-radius: 50%;
   color: #61716a;
@@ -34,8 +25,7 @@
   transition: color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 
-/* Active = the current draft looks like it contains PII (see piiHint in
-   content.js). The badge turns blue and gains a soft halo. */
+/* Active = draft looks like it holds PII (piiHint in content.js): blue + halo. */
 .cloak-mask-badge[data-active="true"] {
   border-color: #6aabdb;
   color: #2879b8;
@@ -62,8 +52,7 @@
   padding: 12px 15px;
   /* Starts 12px low and transparent; the [data-visible] rule slides it in. */
   transform: translate(-50%, 12px);
-  /* Warm parchment palette: informational, not alarming — Cloak is choosing
-     to skip masking for image prompts, and says so. */
+  /* Warm parchment: informational, not alarming. */
   border: 1px solid #e3d8aa;
   border-radius: 7px;
   color: #3e3a28;
@@ -81,9 +70,8 @@
 }
 
 /* ---------- reveal consent dialog ---------- */
-/* The only Cloak element that captures pointer events: the user must
-   answer before getting back to the chat. Centered card on a soft scrim,
-   sage palette shared with the badge so it reads as unmistakably Cloak. */
+/* Only Cloak element that captures pointer events — the answer blocks the
+   chat; sage palette reads as unmistakably Cloak. */
 .cloak-reveal {
   position: fixed;
   inset: 0;
@@ -116,8 +104,7 @@
   color: #3d4a42;
 }
 
-/* The exact value being released, spelled out in a chip — no ambiguity
-   about what "Share" means. */
+/* The exact value being released, spelled out — no ambiguity about "Share". */
 .cloak-reveal-value {
   display: inline-block;
   padding: 1px 7px;

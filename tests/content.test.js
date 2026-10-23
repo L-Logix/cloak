@@ -1,16 +1,7 @@
-// ---------------------------------------------------------------------------
-// Cloak — content-script tests (tests/content.test.js)
-//
-// content.js has no exports (it is an IIFE), so these tests load the real
-// file into a node:vm sandbox that fakes just enough of the browser and the
-// chrome.* extension APIs to drive its message bridge.
-//
-// The suite exists to pin two behaviours:
-//   1. the stats/vault bridge persists messages from the interceptor
-//   2. once the extension context is invalidated (extension reloaded while
-//      the tab stayed open), the bridge goes dormant silently instead of
-//      throwing "Extension context invalidated" on every request
-// ---------------------------------------------------------------------------
+// Cloak — content-script tests. content.js is an IIFE with no exports, so
+// these load the real file into a node:vm sandbox faking the browser and
+// chrome.* APIs. Pins: the stats/vault bridge persists interceptor messages,
+// and an invalidated extension context goes dormant without throwing.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -26,9 +17,8 @@ function loadContentScript() {
     vault: {},
     stats: { requestsChecked: 0, valuesMasked: 0 }
   };
-  // Flip via the returned handle to simulate Chrome severing the extension
-  // context: every chrome.storage call then throws, the way an invalidated
-  // content script sees it.
+  // Flip via the handle to simulate Chrome severing the extension context:
+  // every chrome.storage call then throws.
   const harness = { storageBroken: false, warnings: [], messages: [], storageData, onMessage: null };
 
   const windowObj = {
