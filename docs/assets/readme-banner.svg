@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="263" viewBox="0 0 1280 420" fill="none">
+  <title>Cloak — Your ideas. Not your identity.</title>
+  <desc>A black and green Cloak brand banner with the shield mark. Local privacy for ChatGPT.</desc>
+  <defs>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(1040 210) rotate(90) scale(340 510)" gradientUnits="userSpaceOnUse"><stop stop-color="#14532d" stop-opacity=".65"/><stop offset="1" stop-color="#080c0b" stop-opacity="0"/></radialGradient>
+    <linearGradient id="shield" x1="924" y1="123" x2="1116" y2="310" gradientUnits="userSpaceOnUse"><stop stop-color="#1b4e31"/><stop offset="1" stop-color="#0b1d12"/></linearGradient>
+  </defs>
+  <rect width="1280" height="420" rx="18" fill="#080c0b"/>
+  <rect width="1280" height="420" rx="18" fill="url(#glow)"/>
+  <rect x=".5" y=".5" width="1279" height="419" rx="17.5" stroke="#284333"/>
+  <g font-family="Segoe UI, Arial, sans-serif">
+    <text x="64" y="70" fill="#86efac" font-size="17" font-weight="600" letter-spacing="5">CLOAK</text>
+    <path d="M172 54v20" stroke="#41654d"/>
+    <text x="196" y="69" fill="#9ab5a4" font-size="12" letter-spacing="2.5">AI PRIVACY LAYER</text>
+    <text x="64" y="332" fill="#b3c8bb" font-size="19">Local privacy for ChatGPT.</text>
+    <text x="64" y="366" fill="#7e9b88" font-size="14">Intercept locally. Mask before sending. Restore the reply.</text>
+  </g>
+  <g font-family="Georgia, 'Times New Roman', serif" font-size="73" letter-spacing="-2">
+    <text x="60" y="173" fill="#edf5ef">Your ideas.</text>
+    <text x="60" y="254" fill="#86efac" font-style="italic">Not your identity.</text>
+  </g>
+  <circle cx="1025" cy="210" r="157" stroke="#396c49" stroke-opacity=".4"/>
+  <circle cx="1025" cy="210" r="124" stroke="#396c49" stroke-opacity=".3" stroke-dasharray="3 9"/>
+  <circle cx="1025" cy="53" r="4" fill="#86efac"/>
+  <circle cx="868" cy="210" r="3" fill="#4ade80"/>
+  <path d="m1025 112 73 29v60c0 47-29 82-73 102-44-20-73-55-73-102v-60l73-29Z" fill="url(#shield)" stroke="#4ade80" stroke-width="2"/>
+  <path d="m992 207 22 22 46-49" stroke="#86efac" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

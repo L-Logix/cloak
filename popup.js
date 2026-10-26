@@ -14,11 +14,11 @@ const DEFAULT_SETTINGS = {
   showBadge: true,
   customTerms: []
 };
-// Sites the content script and interceptor are injected into.
+// Frontend release status only. Interception and host permissions are unchanged.
 const SUPPORTED_SITES = [
-  { host: 'chatgpt.com', label: 'ChatGPT' },
-  { host: 'gemini.google.com', label: 'Gemini' },
-  { host: 'claude.ai', label: 'Claude' }
+  { host: 'chatgpt.com', label: 'ChatGPT', supported: true },
+  { host: 'gemini.google.com', label: 'Gemini', supported: false, stage: 'Beta' },
+  { host: 'claude.ai', label: 'Claude', supported: false, stage: 'Alpha' }
 ];
 
 // One lookup of every element the popup touches, collected once at startup.
@@ -154,7 +154,7 @@ function renderOdometer(element, value) {
 
 // ---- site detection --------------------------------------------------------
 
-// Is this tab URL one of the three supported chat sites? Subdomains count.
+// Identify the site for release-status presentation. Subdomains count.
 function supportedSite(url) {
   try {
     const hostname = new URL(url).hostname;
@@ -170,7 +170,7 @@ function supportedSite(url) {
 function render() {
   // Protection drives the accent colour: green on a supported site, red when
   // paused, indigo when idle on an unsupported site.
-  const protectionState = !state.enabled ? 'off' : state.site ? 'on' : 'idle';
+  const protectionState = !state.enabled ? 'off' : state.site?.supported ? 'on' : 'idle';
   const stateChanged = state.protectionState !== undefined && state.protectionState !== protectionState;
   state.protectionState = protectionState;
   document.body.dataset.protectionState = protectionState;
@@ -200,7 +200,10 @@ function render() {
     ui.statusCaption.textContent = 'Prompts pass through unmasked';
   } else if (!state.site) {
     ui.statusLabel.textContent = 'Idle';
-    ui.statusCaption.textContent = 'Unsupported site';
+    ui.statusCaption.textContent = 'Supported on ChatGPT only';
+  } else if (!state.site.supported) {
+    ui.statusLabel.textContent = `${state.site.label} · ${state.site.stage}`;
+    ui.statusCaption.textContent = 'Experimental · ChatGPT only is supported';
   } else {
     ui.statusLabel.textContent = `Protecting ${state.site.label}`;
     ui.statusCaption.textContent = 'Protection is on';

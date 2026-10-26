@@ -1,0 +1,169 @@
+/* The website's dark presentation. Cloak's protection-on green is #4ade80. */
+:root {
+  color-scheme: dark;
+  --bg: #080c0b;
+  --surface: #111915;
+  --ink: #e6ebf5;
+  --muted: #9caea4;
+  --line: #24372c;
+  --green: #4ade80;
+  --green-light: #14301f;
+  --navy: #0b1120;
+  background: var(--bg);
+}
+body {
+  background:
+    radial-gradient(ellipse 650px 510px at 83% 320px, #16653438, transparent 75%),
+    radial-gradient(ellipse 450px 550px at 0 0, #14532d1c, transparent 80%),
+    #080c0b;
+}
+::selection { background: #4ade8040; color: #fff; }
+button:focus-visible, a:focus-visible, input:focus-visible,
+textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
+  outline-color: #86efac;
+}
+.header { border-color: #ffffff10; }
+.brand { color: #f0f6f2; }
+.brand img { filter: drop-shadow(0 0 10px #4ade8030); }
+.brand-divider { background: #ffffff20; }
+.header nav { color: #b2beb6; }
+.nav-cta { border-color: #3b5345; background: #14231a55; color: #d6eade; }
+.nav-cta:hover { border-color: #4ade8070; background: #14301f; }
+.hero { position: relative; }
+.hero-copy { position: relative; z-index: 1; }
+.hero h1 { color: #f0f4f1; }
+.hero h1 em, .install-top h2 em {
+  background: linear-gradient(115deg, #a3f5bd 0%, #4ade80 46%, #25ac62 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+.hero .intro { color: #a8b8ae; }
+.status-dot { background: #4ade80; box-shadow: 0 0 0 4px #4ade800c, 0 0 13px #4ade8060; }
+.button.primary {
+  color: #06150c;
+  background: linear-gradient(115deg, #75eba0, #4ade80 55%, #39cb70);
+  border: 1px solid #8cf3b050;
+  box-shadow: 0 3px 15px #4ade8015, inset 0 1px 0 #ffffff50;
+}
+.button.primary:hover {
+  background: linear-gradient(115deg, #a0f5bf, #6aec98 60%, #4ade80);
+  box-shadow: 0 5px 24px #4ade8028;
+}
+.hero-actions .text-link { color: #d0dfd5; }
+.hero-actions .text-link:hover { color: #4ade80; }
+.compatibility { border-color: #ffffff12; }
+.compatibility strong { color: #bacac0; }
+.compatibility > span { color: #91a398; }
+.hero-visual {
+  background-color: #0c1512;
+  background-image:
+    radial-gradient(ellipse at 55% 48%, #1b653b30, transparent 65%),
+    radial-gradient(#8bdbac15 1px, transparent 1px);
+  background-size: auto, 20px 20px;
+  border: 1px solid #3a684a80;
+  box-shadow: 0 0 70px #22c55e0d, 0 25px 60px #0005, inset 0 1px 0 #86efac0a;
+}
+.visual-top { color: #89a697; }
+.orbital { border-color: #4ade8010; }
+.message-card {
+  background: linear-gradient(140deg, #1d2d24, #142019);
+  border-color: #3c5546;
+  box-shadow: 0 16px 30px #0004;
+}
+.masked-card {
+  background: linear-gradient(125deg, #183a26, #11251a);
+  border-color: #418358;
+  box-shadow: 0 16px 30px #0004, 0 0 30px #4ade8006;
+}
+.message-card mark { background: #ffffff08; border-color: #9aad9e80; }
+.message-card code { color: #86efac; background: #4ade8014; }
+.shield-core img { filter: drop-shadow(0 0 22px #4ade8070); }
+.shield-core span { color: #a9e8bc; }
+.visual-bottom { color: #9eb3a5; }
+.visual-bottom strong { color: #d5e9dc; }
+.illustration-label { color: #8ca596; }
+.project-strip {
+  border-color: #294232;
+  background: linear-gradient(90deg, #0d1711, #13261a 55%, #0d1711);
+}
+.project-strip > .wrap { color: #adbdaf; }
+.project-strip b { color: #d3eddb; }
+.strip-divider { color: #56725f; }
+.steps article { border-color: #304637; }
+.step-number { color: #92aa99; }
+.highlight { background: #14301f; color: #86efac; }
+.token { border-color: #376246; color: #86efac; background: #14301f; }
+.lab-section {
+  background:
+    radial-gradient(ellipse 650px 400px at 20% 10%, #14532d38, transparent 80%),
+    linear-gradient(145deg, #101d15, #0c140f 60%, #101e15);
+  border-color: #294232;
+}
+.lab-shell {
+  background: #0d1510;
+  border-color: #35533f;
+  box-shadow: 0 24px 80px #0004, 0 0 60px #22c55e05;
+}
+.lab-toolbar { background: #15221a; border-color: #2b4032; }
+.presets button { color: #aec0b3; }
+.presets button.selected { color: #86efac; background: #203b2a; border-color: #3e644a; }
+.presets button:hover { color: #d9f5e2; background: #203b2a; }
+.input-pane { background: linear-gradient(155deg, #111a14, #0e1610); }
+.input-pane textarea { color: #d6e5dc; }
+.pane-heading { color: #d9eade; }
+.pane-heading .masked-count { color: #86efac !important; background: #1b3c28; }
+.coverage { border-color: #2b4032; }
+.coverage input { accent-color: #4ade80; }
+#custom-term { color: #d6e5dc; background: #0a110d; border-color: #304a38; }
+#custom-term::placeholder { color: #83998b; }
+.output-pane {
+  background: radial-gradient(ellipse at 90% 100%, #1a3d2625, transparent 75%), #0a120d;
+  border-color: #2b4032;
+}
+.output-tabs { border-color: #2b4032; }
+.output-tabs button { color: #a6b9ac; }
+.output-tabs button[aria-selected=true] { color: #86efac; border-color: #4ade80; }
+#result { color: #b2c8ba; }
+#result mark { background: #1c412b; color: #91f4b2; }
+.result-bottom { border-color: #2b4032; color: #86efac; }
+.result-bottom > span:last-child { color: #92b19b; }
+.demo-vault-row { border-color: #243a2c; }
+.lab-footnote { background: #111c15; border-color: #2b4032; color: #9db4a5; }
+.feature-large {
+  background: radial-gradient(ellipse at 100% 0, #1b563232, transparent 65%), linear-gradient(145deg, #131f17, #101a13);
+  border-color: #304c39;
+  box-shadow: 0 12px 30px #0002;
+}
+.vault-art > div { background: #0b140f; border-color: #2b4032; }
+.vault-art > div > span { color: #a0b9a9; }
+.fake-reveal { border-color: #35543f; background: #15271c; }
+.feature-list article { border-color: #24372c; }
+.project-section {
+  background:
+    radial-gradient(ellipse 600px 420px at 85% 0, #12432b38, transparent 80%),
+    linear-gradient(130deg, #0b1120, #0b1711 70%, #0b1510);
+  border-block: 1px solid #273c2e;
+}
+.project-section .section-heading > p, .project-grid p { color: #a8b9ae; }
+.project-grid article { border-color: #38504080; }
+.project-index { color: #8fbd9e; }
+.architecture { border-color: #34513f; background: linear-gradient(110deg, #12271a60, #15211b50); }
+.architecture b { color: #c9e2d1; }
+.architecture b.architecture-accent { color: #86efac; }
+.architecture i { color: #80c596; }
+.architecture p { color: #a0b7a8; }
+.faq-list details { border-color: #2a4031; }
+.install-section {
+  position: relative;
+  background: radial-gradient(ellipse 500px 280px at 50% 40%, #1c64302b, transparent 75%);
+  border-color: #294232;
+}
+.install-steps li > span { background: #173120; border-color: #3a5c44; color: #86efac; }
+.footer > div:last-child > span, .footer > div:last-child > a { color: #a3bfad; }
+.skip-link { background: #14251a; color: #e6ebf5; }
+.noscript-note { color: #fda4af; }
+@media (prefers-contrast: more) {
+  :root { --muted: #d0ded5; --line: #577360; }
+  .hero h1 em, .install-top h2 em { background: none; color: #86efac; }
+}

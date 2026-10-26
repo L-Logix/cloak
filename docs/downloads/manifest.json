@@ -1,0 +1,22 @@
+{
+  "archive": "cloak-extension.zip",
+  "sha256": "0bd368d3459049fcb06b936996f8db843a932c6e2a130e1dc01c64c351cbf896",
+  "files": {
+    "manifest.json": "d7b2d1bdc270a14fc625299ef959668eb07932fbef12665825d887dc46d6a0b8",
+    "popup.html": "12a907a34054393a7757cd8558c86d7405c2b80d2fdf89deb51d0fdb9132ca3f",
+    "popup.js": "20c0c48efe986ca23aaa37f427dd90a054203a27843942c156cdbce7400a863b",
+    "styles.css": "d66447c891e575ab278483d1be9ad6a23e84e141b4f4b2fbdb8e3f48fd76c7d1",
+    "content.js": "cca80674620ae14b31599cd8c09de0ee7d6a9641469f508c5b07474669ba38da",
+    "content.css": "3d799afdaa6cf6fd480862f658c5eb34e072b58662bad7786c0ecc5ae2077f80",
+    "intercept.js": "ee5bb0bdd61d5dd7e141bfb0478b3453538904e98d3afc8f39f664f187784582",
+    "intercept.bundle.js": "81f210d0211156c392013a53a8fbc25fa11d4bfbae14b714561c13acf779af1c",
+    "package.json": "603ee1f05a6bef8c88449fbe49b738e46761907697f7624884df5449ffa9dfd6",
+    "package-lock.json": "a85987cde3ca7ef43d37a5f7682dfcc9595c7b15711244921b88d6f31fa41ecb",
+    "LICENSE": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809",
+    "README.md": "f55d47cd03c6aea146cfc136a674210f2fae0ecc218d4f9085bb8ef944b1f171",
+    "tests/intercept.test.js": "3b41abc94a0c2967b2518c9de8e761c1104ad19fd65ec99892e57a0250d3975f",
+    "tests/content.test.js": "11a385e392227e588b94b81a0e386d20ff2d01878846312308bb947a13156fec",
+    "tests/README.md": "0316884124b1fd954b7a43edc8076a608397d5631e33785af0bcb7c0a0696203"
+  },
+  "verification": "Every archived file matches the current repository source byte-for-byte."
+}
