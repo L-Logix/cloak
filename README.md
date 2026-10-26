@@ -154,7 +154,7 @@ The website uses plain HTML, CSS, and JavaScript. Its demos run without AI reque
 
 Created by an eighth-grade student in **North Carolina’s 4th Congressional District** for the **2026 Congressional App Challenge**, represented by **Rep. Valerie Foushee**. Cloak explores a practical question for the Research Triangle: how can people use AI while keeping personal details under their control?
 
-The project’s North Carolina research documents privacy-based AI restrictions and an illustrative adoption scenario. [Read the sources, population figures, and methodology](docs/impact-methodology.md).
+The project’s source register documents **49 North Carolina organizations with published AI privacy limits and guidance**, spanning higher education, K–12 schools, government, business, and healthcare. Each entry identifies the scope of the rule, including conditional approvals and nonbinding recommendations. A separate population subtotal covers **267,382 fall-2025 enrollments at 14 cited universities**. These are documented examples and community-size figures, not a statewide ban count or measured product adoption. If every student in that subtotal used ChatGPT with Cloak, combining published usage and sensitive-data rates models **97,274 sensitive messages per day (about 35.5 million per year)**. This describes potential exposure, not measured PII saved; the linked methodology distinguishes sensitive data from PII and states every assumption. [Read every source, the enrollment calculation, and the full-use exposure scenario](docs/impact-methodology.md).
 
 ## Roadmap
 

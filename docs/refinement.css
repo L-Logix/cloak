@@ -32,6 +32,9 @@
 .impact-sources li span { display: block; }
 .impact-sources a { color: #a0f4bb; text-decoration: underline; text-underline-offset: 3px; }
 .impact-sources strong { color: #dce8e0; }
+.impact-sources h3 { color: #dce8e0; font: 20px Georgia,serif; margin-top: 28px; }
+@media(min-width:601px) and (max-width:900px) { .proof-numbers { grid-template-columns: 1fr 1fr; } }
+@media(max-width:480px) { .proof-numbers { grid-template-columns: 1fr !important; } }
 @media(min-width:381px) and (max-width:600px) { .proof-numbers { grid-template-columns: 1fr 1fr; } }
 @media(max-width:600px) { .proof-followthrough { flex-direction: column; gap: 13px; } }
 .lab-section { background: radial-gradient(ellipse at 50% 0,#124d2728,transparent 70%),#09100c; }
