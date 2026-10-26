@@ -1,0 +1,8 @@
+Patient name: Alex Morgan
+Email: alex@example.com
+Phone: 919-555-0142
+Address: 123 Main Street, Raleigh, NC 27601
+
+Medical history: 52-year-old with type 2 diabetes and hypertension. Takes metformin and lisinopril. Reports fatigue; recent HbA1c is 8.2%.
+
+Analyze this history in three brief bullets: key patterns, missing information, and questions for clinician review. Do not recommend treatment. Begin with the patient name and email exactly as provided.

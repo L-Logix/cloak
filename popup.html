@@ -1,20 +1,9 @@
 <!doctype html>
 <!--
-  Cloak — extension popup (popup.html)
-
-  This is the user-facing control panel: a fixed 380×560 shell with a header,
-  a five-to-six page stage switched by the bottom nav, and the nav itself.
-
-  Pages
-    home     master toggle, live site status, activity odometers
-    try      live masking demo — runs the real engine locally, saves nothing
-    vault    token → value table with search, reveal, export, clear
-    coverage per-category detection toggles (names/emails/phones/addresses)
-    terms    personal dictionary of extra words to mask
-    settings reply restoration, badge, supported sites, counters reset
-
-  Scripts load in order: intercept.bundle.js exposes window.CloakPreview
-  (see the bottom of intercept.js), then popup.js wires every interaction.
+  Cloak — extension popup: 380×560 shell, page stage switched by bottom nav.
+  Pages: home, try (live demo), vault, coverage, terms, settings.
+  Scripts load in order: intercept.bundle.js exposes window.CloakPreview,
+  then popup.js wires the interactions.
 -->
 <html lang="en">
 <head>
@@ -22,14 +11,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cloak</title>
   <link rel="stylesheet" href="styles.css">
-  <!-- Same bundle the chat pages load; in extension pages it only exposes
-       CloakPreview (it never hooks this popup's fetch/XHR). -->
+  <!-- Same bundle the chat pages load; here it only exposes CloakPreview. -->
   <script src="intercept.bundle.js" defer></script>
   <script src="popup.js" defer></script>
 </head>
 <body class="popup-body">
   <main class="popup-shell">
-    <!-- Brand header: shield mark + the "ON DEVICE" trust badge. -->
     <header class="popup-header">
       <div class="brand" aria-label="Cloak">
         <span class="brand-mark" aria-hidden="true">
@@ -43,12 +30,11 @@
       <span class="local-tag"><span class="local-dot"></span>ON DEVICE</span>
     </header>
 
-    <!-- Every page lives here at once; popup.js un/hidden them via the nav. -->
+    <!-- All page-views live here; popup.js shows one via the nav. -->
     <div class="page-stage">
 
       <!-- ================= HOME ================= -->
       <section class="page-view home-view" data-page-view="home" aria-labelledby="home-heading">
-        <!-- Master switch: one button controls every page's interception. -->
         <div class="power-row">
           <button class="power-control" id="master-toggle" type="button" role="switch" aria-checked="true" aria-label="Cloak protection" aria-describedby="protection-detail">
             <svg viewBox="0 0 32 32" focusable="false">
@@ -58,11 +44,11 @@
           </button>
           <span class="power-copy">
             <strong id="power-label">Protection on</strong>
-            <small id="protection-detail">Sensitive values are checked locally.</small>
+            <small id="protection-detail">Local privacy for ChatGPT.</small>
           </span>
         </div>
 
-        <!-- Live status of the currently focused tab (protected / idle / off). -->
+        <!-- Live status of the focused tab. -->
         <div class="home-status" id="site-status" data-active="false" role="status" aria-live="polite">
           <span class="status-light" aria-hidden="true"></span>
           <span class="status-copy">
@@ -72,8 +58,7 @@
           <span class="site-mark" id="site-mark" aria-hidden="true">AI</span>
         </div>
 
-        <!-- Lifetime activity counters, stored locally and rendered as an
-             odometer so changes roll instead of jump. -->
+        <!-- Counters render as an odometer so changes roll instead of jump. -->
         <section class="activity-section" aria-labelledby="home-heading">
           <div class="activity-heading">
             <div>
@@ -94,15 +79,12 @@
               <small>Supported chat submissions</small>
             </div>
           </div>
-          <!-- Honest limitation, shown permanently: detection is best-effort. -->
-          <p class="activity-disclaimer">Pattern detection can miss details. Review prompts before sending.</p>
+          <p class="activity-disclaimer">Supported on ChatGPT only. Pattern detection can miss details. Review prompts before sending.</p>
         </section>
       </section>
 
       <!-- ================= TRY (live demo) ================= -->
-      <!-- Runs the real masking engine (intercept.bundle.js) inside this
-           popup. Nothing typed here is stored or sent anywhere: the masker
-           instance lives only for the lifetime of the page. -->
+      <!-- Runs the real masking engine; nothing typed here is stored or sent. -->
       <section class="page-view try-view" data-page-view="try" aria-labelledby="try-heading" hidden>
         <div class="page-title-row">
           <div>
@@ -127,7 +109,6 @@
           <pre class="try-output" id="try-output" aria-live="polite">Type or paste above to preview masking.</pre>
         </div>
 
-        <!-- One chip per category that fired, with its hit count. -->
         <div class="try-chips" id="try-chips" aria-live="polite"></div>
 
         <p class="settings-note"><span class="local-dot" aria-hidden="true"></span>Same engine as the page hook. Preview is never saved.</p>
@@ -148,21 +129,20 @@
           <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m12.5 12.5 4 4"/></svg>
           <input id="vault-search" type="search" placeholder="Find a token or value" autocomplete="off" spellcheck="false" aria-label="Search vault entries">
         </label>
-        <!-- Rows are built by popup.js; the child below is the empty state. -->
+        <!-- Rows built by popup.js; the child below is the empty state. -->
         <div class="vault-list" id="vault-list" aria-live="polite">
           <p class="empty-vault">Nothing masked yet. Your tokens will appear here.</p>
         </div>
         <div class="vault-actions">
           <p class="vault-message" id="vault-message" aria-live="polite"></p>
           <div class="vault-buttons">
-            <!-- Export downloads the vault as JSON for backup or audit. -->
             <button class="clear-button" id="export-vault" type="button" disabled>
               <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
                 <path d="M10 3v9m0 0 3.2-3.2M10 12 6.8 8.8M4 14.5v1A1.5 1.5 0 0 0 5.5 17h9a1.5 1.5 0 0 0 1.5-1.5v-1" />
               </svg>
               <span>Export</span>
             </button>
-            <!-- Clear vault is destructive, so it stays disabled when empty. -->
+            <!-- Destructive, so disabled when empty. -->
             <button class="clear-button" id="clear-vault" type="button" disabled>
               <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
                 <path d="M4 6h12M8 6V4h4v2m-6 0 .7 10h6.6L14 6M8.5 9v4m3-4v4" />
@@ -174,8 +154,7 @@
       </section>
 
       <!-- ================= COVERAGE ================= -->
-      <!-- Category switches feed the masker through CLOAK_CONFIG; turning one
-           off takes effect on the very next request. -->
+      <!-- Category switches feed the masker via CLOAK_CONFIG. -->
       <section class="page-view coverage-view" data-page-view="coverage" aria-labelledby="coverage-heading" hidden>
         <div class="page-title-row">
           <div>
@@ -221,7 +200,6 @@
           <input id="custom-term-input" type="text" maxlength="80" autocomplete="off" placeholder="Add a private term">
           <button type="submit" aria-label="Add custom term">Add</button>
         </form>
-        <!-- Live region announces save/remove results to screen readers. -->
         <p class="term-feedback" id="term-feedback" aria-live="polite"></p>
         <ul class="custom-term-list" id="custom-term-list" aria-label="Saved custom terms"></ul>
         <p class="settings-note"><span class="local-dot" aria-hidden="true"></span>Terms stay in this browser.</p>
@@ -247,13 +225,11 @@
           </label>
         </div>
         <div class="supported-sites">
-          <p class="eyebrow">SUPPORTED CHATS</p>
-          <div><span class="site-dot" aria-hidden="true"></span>ChatGPT<span>SUPPORTED</span></div>
-          <div><span class="site-dot" aria-hidden="true"></span>Gemini<span>SUPPORTED</span></div>
-          <div><span class="site-dot" aria-hidden="true"></span>Claude<span>SUPPORTED</span></div>
+          <p class="eyebrow">CURRENT PLATFORM</p>
+          <div><span class="site-dot" aria-hidden="true"></span>ChatGPT<span>STABLE</span></div>
         </div>
-        <!-- Counter reset lives on its own row so it is never mixed with the
-             category switches (accidental resets are worse than extra clicks). -->
+        <p class="settings-note">ChatGPT only. Gemini (Beta) and Claude (Alpha) are experimental and not supported in this release.</p>
+        <!-- Reset kept on its own row, away from the category switches. -->
         <div class="settings-action-row">
           <span><strong>Activity totals</strong><small>Reset local dashboard counters</small></span>
           <button id="reset-activity" class="text-action" type="button">Reset</button>
@@ -262,8 +238,7 @@
       </section>
     </div>
 
-    <!-- Bottom navigation: one button per page-view above. popup.js keeps the
-         active state and aria-current in sync when a button is pressed. -->
+    <!-- Bottom navigation: one button per page-view. -->
     <nav class="bottom-nav" aria-label="Main navigation">
       <button class="nav-item is-active" type="button" data-page-target="home" aria-current="page">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m3 9 7-6 7 6v8h-5v-5H8v5H3z" /></svg>

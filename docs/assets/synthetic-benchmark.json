@@ -1,0 +1,10 @@
+{
+  "measuredAt": "2026-10-25T20:23:35.045Z",
+  "prompts": 1024,
+  "maskedValues": 4096,
+  "exactRoundTrips": 1024,
+  "promptsWithAllFourCategories": 1024,
+  "scope": "1,024 generated samples across four task phrases, with a fixed fictional name and varying email, phone, and street number. Not a real-world accuracy benchmark, user count, or clinical validation.",
+  "command": "node docs/benchmark.cjs",
+  "previewSha256": "376e6c3ceff8f2c183c2a6fdf1274d4421f42eb243fdb324f19b39e39bc9b810"
+}

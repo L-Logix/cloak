@@ -1,18 +1,10 @@
-// ---------------------------------------------------------------------------
-// Cloak — popup controller (popup.js)
-//
-// Loads the persisted state (enabled / settings / vault / stats) from
-// chrome.storage.local, renders every page of the popup from that single
-// `state` object, and writes changes straight back. Live updates arrive via
-// chrome.storage.onChanged, so the popup never goes stale while it is open.
-//
-// The "Try it" page additionally uses window.CloakPreview (exposed by
-// intercept.bundle.js inside extension pages) to run the real masking engine
-// locally — the exact code the chat-page hook uses, with zero side effects.
-// ---------------------------------------------------------------------------
+// Cloak — popup controller: loads state from chrome.storage.local, renders
+// every page from one `state` object, writes changes back; storage.onChanged
+// keeps it live while open. The "Try it" page runs the real masking engine
+// locally via window.CloakPreview (intercept.bundle.js).
 
-// Defaults mirrored in content.js and intercept.js. Merging them over stored
-// values means new settings added in later versions appear automatically.
+// Defaults mirrored in content.js and intercept.js; merged over stored values
+// so new settings appear automatically.
 const DEFAULT_SETTINGS = {
   names: true,
   emails: true,
@@ -22,16 +14,14 @@ const DEFAULT_SETTINGS = {
   showBadge: true,
   customTerms: []
 };
-// Sites the content script and interceptor are injected into. The popup uses
-// this list to decide whether the current tab is being protected.
+// Frontend release status only. Interception and host permissions are unchanged.
 const SUPPORTED_SITES = [
-  { host: 'chatgpt.com', label: 'ChatGPT' },
-  { host: 'gemini.google.com', label: 'Gemini' },
-  { host: 'claude.ai', label: 'Claude' }
+  { host: 'chatgpt.com', label: 'ChatGPT', supported: true },
+  { host: 'gemini.google.com', label: 'Gemini', supported: false, stage: 'Beta' },
+  { host: 'claude.ai', label: 'Claude', supported: false, stage: 'Alpha' }
 ];
 
-// One lookup of every element the popup touches, collected once at startup so
-// no handler ever does repeated getElementById work.
+// One lookup of every element the popup touches, collected once at startup.
 const ui = {
   masterToggle: document.getElementById('master-toggle'),
   powerLabel: document.getElementById('power-label'),
@@ -67,9 +57,8 @@ const ui = {
   navigation: [...document.querySelectorAll('[data-page-target]')]
 };
 
-// Single source of truth for rendering. Everything the UI shows is derived
-// from this object; every mutation is followed by render() and, if it should
-// survive a popup close, save().
+// Single source of truth for rendering; every mutation is followed by
+// render() and, when it should survive a popup close, save().
 let state = {
   enabled: true,
   settings: { ...DEFAULT_SETTINGS },
@@ -108,9 +97,8 @@ function showPage(pageName) {
 
 // ---- odometer (animated counters) -----------------------------------------
 
-// Render a number as a stack of digit reels and slide each reel to its digit.
-// The element's dataset.layout remembers the digit count so a re-render with
-// the same width only slides reels instead of rebuilding the DOM.
+// Render a number as digit reels; dataset.layout remembers the width so
+// same-shape re-renders only slide instead of rebuilding.
 function renderOdometer(element, value) {
   const number = Number.isSafeInteger(value) && value >= 0 ? value : 0;
   const formatted = new Intl.NumberFormat('en-US').format(number);
@@ -166,7 +154,7 @@ function renderOdometer(element, value) {
 
 // ---- site detection --------------------------------------------------------
 
-// Is this tab URL one of the three supported chat sites? Subdomains count.
+// Identify the site for release-status presentation. Subdomains count.
 function supportedSite(url) {
   try {
     const hostname = new URL(url).hostname;
@@ -178,12 +166,11 @@ function supportedSite(url) {
 
 // ---- main render -----------------------------------------------------------
 
-// Rebuild every dynamic part of the popup from `state`. Called after any state
-// change; the DOM work is small enough that batching is unnecessary.
+// Rebuild every dynamic part of the popup from `state`.
 function render() {
   // Protection drives the accent colour: green on a supported site, red when
   // paused, indigo when idle on an unsupported site.
-  const protectionState = !state.enabled ? 'off' : state.site ? 'on' : 'idle';
+  const protectionState = !state.enabled ? 'off' : state.site?.supported ? 'on' : 'idle';
   const stateChanged = state.protectionState !== undefined && state.protectionState !== protectionState;
   state.protectionState = protectionState;
   document.body.dataset.protectionState = protectionState;
@@ -213,7 +200,10 @@ function render() {
     ui.statusCaption.textContent = 'Prompts pass through unmasked';
   } else if (!state.site) {
     ui.statusLabel.textContent = 'Idle';
-    ui.statusCaption.textContent = 'Unsupported site';
+    ui.statusCaption.textContent = 'Supported on ChatGPT only';
+  } else if (!state.site.supported) {
+    ui.statusLabel.textContent = `${state.site.label} · ${state.site.stage}`;
+    ui.statusCaption.textContent = 'Experimental · ChatGPT only is supported';
   } else {
     ui.statusLabel.textContent = `Protecting ${state.site.label}`;
     ui.statusCaption.textContent = 'Protection is on';
@@ -221,8 +211,7 @@ function render() {
 
   // ---- vault ----
   const entries = Object.entries(state.vault || {});
-  // Sanitise custom terms on every render: strings only, trimmed, capped at
-  // 100 so a corrupted storage value can never freeze the popup.
+  // Sanitise custom terms on every render: strings only, trimmed, capped at 100.
   state.settings.customTerms = Array.isArray(state.settings.customTerms)
     ? state.settings.customTerms.filter((term) => typeof term === 'string' && term.trim()).slice(0, 100)
     : [];
@@ -266,8 +255,7 @@ function render() {
       const value = document.createElement('span');
       value.className = 'vault-value';
       const revealed = state.revealedTokens.has(token);
-      // Bullets by default: a shoulder-surfer should learn nothing from a
-      // screen-sharing session with the popup open.
+      // Bullets by default — a shoulder-surfer learns nothing from a screen-share.
       value.textContent = revealed ? String(original) : '••••••••';
       value.classList.toggle('is-hidden', !revealed);
       const revealButton = document.createElement('button');
@@ -322,9 +310,8 @@ function renderCustomTerms() {
 
 // ---- "Try it" live preview -------------------------------------------------
 
-// A fresh masker per run would re-run the NLP over the whole text on every
-// keystroke; reusing one and clearing it is cheaper and behaves identically
-// for the preview's single-string use case.
+// One masker reused across runs — re-creating it would re-run the NLP on
+// every keystroke; clear() is cheaper and behaves identically here.
 const previewMasker = window.CloakPreview?.createMasker ? window.CloakPreview.createMasker() : null;
 let previewTimer; // debounce handle for typing bursts
 
@@ -351,9 +338,8 @@ function renderPreview() {
     return;
   }
 
-  // Reconfigure from the live settings so Coverage toggles apply here too.
-  // enabled is forced on: the preview is a sandbox, not a reflection of the
-  // master switch (it never touches real traffic either way).
+  // Live settings apply here too; enabled forced on — this preview is a
+  // sandbox, not the master switch.
   previewMasker.clear();
   previewMasker.configure({ enabled: true, settings: state.settings });
 
@@ -399,8 +385,8 @@ function schedulePreview() {
 
 // ---- vault export ----------------------------------------------------------
 
-// Download the vault as a pretty-printed JSON file. Runs entirely in the
-// popup: a Blob URL is created, clicked, and revoked immediately.
+// Download the vault as pretty-printed JSON: Blob URL created, clicked,
+// revoked immediately — entirely inside the popup.
 function exportVaultFile() {
   const entries = Object.entries(state.vault || {});
   if (!entries.length) return;
@@ -433,8 +419,7 @@ ui.vaultSearch.addEventListener('input', () => {
   render();
 });
 
-// Reveal toggles are handled by delegation: rows are rebuilt on every render,
-// so one listener on the list outlives them all.
+// Delegated: rows are rebuilt every render, so one listener outlives them.
 ui.vaultList.addEventListener('click', (event) => {
   const button = event.target.closest('[data-reveal-token]');
   if (!button) return;
@@ -486,8 +471,7 @@ ui.resetActivity.addEventListener('click', () => {
 
 // ---- storage helpers -------------------------------------------------------
 
-// Persist a partial state patch. Guarded so the popup still renders when it
-// is opened outside Chrome (the static preview mode used during design).
+// Persist a partial patch; no-op outside Chrome (static design preview).
 function save(changes) {
   if (!globalThis.chrome?.storage?.local) return;
   chrome.storage.local.set(changes, () => {
@@ -504,8 +488,7 @@ function showVaultMessage(message) {
   }, 2400);
 }
 
-// Master switch: flip, repaint, persist. The content script picks the change
-// up via storage.onChanged and republishes CLOAK_CONFIG to the page.
+// Flip, repaint, persist — the content script republishes CLOAK_CONFIG on change.
 ui.masterToggle.addEventListener('click', () => {
   state.enabled = !state.enabled;
   render();
@@ -521,8 +504,7 @@ ui.settings.forEach((input) => {
   });
 });
 
-// Clearing the vault also wipes the interceptor's in-memory token map (the
-// content script notices the empty vault and posts CLOAK_CLEAR_MEMORY).
+// Clearing the vault also wipes the interceptor's in-memory map (CLOAK_CLEAR_MEMORY).
 ui.clearVault.addEventListener('click', () => {
   state.vault = {};
   state.revealedTokens.clear();
@@ -536,8 +518,7 @@ ui.exportVault.addEventListener('click', exportVaultFile);
 
 // ---- "Try it" page events --------------------------------------------------
 
-// Example prompt with one value per category, so a single click demos the
-// whole engine (name + email + phone + address all light up).
+// Example prompt covering every category so one click demos the whole engine.
 ui.tryExample.addEventListener('click', () => {
   ui.tryInput.value = 'Hi, my name is Bob Carter. You can reach me at bob.carter@example.com or 919-123-4567, or visit 742 Evergreen Terrace.';
   renderPreview();
@@ -555,8 +536,7 @@ ui.tryInput.addEventListener('input', schedulePreview);
 // ---- startup ---------------------------------------------------------------
 
 function initialize() {
-  // Outside Chrome (or without extension APIs) fall back to a static preview
-  // so the popup can still be opened as a plain HTML file while designing.
+  // Outside Chrome: static preview so the popup opens as a plain HTML file.
   if (!globalThis.chrome?.storage?.local || !globalThis.chrome?.tabs) {
     render();
     ui.statusLabel.textContent = 'Preview mode';

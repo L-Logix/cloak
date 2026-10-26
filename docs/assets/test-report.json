@@ -1,0 +1,15 @@
+{
+  "verifiedDate": "2026-10-24",
+  "command": "node --test tests/intercept.test.js tests/content.test.js",
+  "tests": 49,
+  "passed": 49,
+  "failed": 0,
+  "scope": "Repository unit and simulated integration tests; not live provider certification.",
+  "sourceHashes": {
+    "intercept.js": "ee5bb0bdd61d5dd7e141bfb0478b3453538904e98d3afc8f39f664f187784582",
+    "intercept.bundle.js": "81f210d0211156c392013a53a8fbc25fa11d4bfbae14b714561c13acf779af1c",
+    "content.js": "cca80674620ae14b31599cd8c09de0ee7d6a9641469f508c5b07474669ba38da",
+    "tests/intercept.test.js": "3b41abc94a0c2967b2518c9de8e761c1104ad19fd65ec99892e57a0250d3975f",
+    "tests/content.test.js": "11a385e392227e588b94b81a0e386d20ff2d01878846312308bb947a13156fec"
+  }
+}

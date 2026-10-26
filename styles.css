@@ -1,23 +1,8 @@
 /* ---------------------------------------------------------------------------
-   Cloak — popup stylesheet (styles.css)
-
-   Structure of this file
-     1. design tokens      every colour, radius, shadow, font in one place
-     2. base reset         box-sizing, focus rings, screen-reader utilities
-     3. shell + header     the 380×560 frame, brand mark, "ON DEVICE" tag
-     4. page views         shared title/description furniture per page
-     5. home               power switch, status card, odometer metrics
-     6. try                live-masking demo (textarea → masked output + chips)
-     7. vault              search, token rows, reveal buttons, export/clear
-     8. settings lists     reusable toggle rows (coverage + preferences)
-     9. custom terms       dictionary form and list
-    10. bottom navigation  six-icon nav bar
-    11. dark theme         token overrides under prefers-color-scheme
-    12. reduced motion     global animation kill-switch
-
-   Theming works by swapping the accent token based on protection state
-   (green = protecting, red = paused, indigo = idle) and by a dark-mode
-   media query that overrides the surface/text tokens.
+   Cloak — popup stylesheet. Sections: design tokens, base reset, shell and
+   header, page views, home, try, vault, settings lists, custom terms, bottom
+   nav, dark theme, reduced motion. Accent swaps with protection state
+   (green = protecting, red = paused, indigo = idle).
 --------------------------------------------------------------------------- */
 
 /* ========================= 1. design tokens ============================== */
@@ -26,8 +11,7 @@
   /* Let the browser pick its own form-control and scrollbar scheme. */
   color-scheme: light dark;
   --font-ui: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
-  /* Display face is a serif — it gives the big numbers and titles a
-     distinct editorial voice against the UI sans of everything else. */
+  /* Display serif — editorial voice for the big numbers and titles. */
   --font-display: Georgia, "Times New Roman", serif;
 
   /* Neutral surfaces (light theme). */
@@ -52,8 +36,7 @@
   --danger: #d92d20;
   --danger-soft: #fee4e2;
 
-  /* Accent defaults to indigo; the body[data-protection-state] rules below
-     swap these three for green or red depending on the switch and site. */
+  /* Indigo by default; protection-state rules below swap to green/red. */
   --accent: #4f46e5;
   --accent-strong: #4338ca;
   --accent-soft: #eef0ff;
@@ -68,8 +51,7 @@
 
 * { box-sizing: border-box; }
 
-/* The popup is a fixed-size card: fixed width/height, no page scroll —
-   individual pages scroll internally instead. */
+/* Fixed-size card: individual pages scroll internally, not the page itself. */
 body.popup-body {
   width: 380px;
   height: 560px;
@@ -356,9 +338,7 @@ button { cursor: pointer; }
 }
 .activity-metric > p { margin: 0; color: var(--muted); font-size: 11px; font-weight: 650; }
 .activity-metric > small { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; line-height: 1.35; }
-/* Odometer: a column of digit reels clipped by .odometer-window; popup.js
-   slides each reel with translateY. tabular-nums is scoped to the window so
-   the comma separator stays optically centred. */
+/* Odometer: digit reels clipped by .odometer-window; popup.js slides them. */
 .odometer {
   display: flex;
   min-height: 46px;
@@ -599,8 +579,7 @@ button { cursor: pointer; }
   transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
 }
 .clear-button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-/* Hover turns destructive (red) — applies to both buttons; Export's hover is
-   overridden below to accent instead of danger. */
+/* Destructive hover; Export's hover overrides to accent instead of danger. */
 .clear-button:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
 #export-vault:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 .clear-button:disabled { opacity: .5; cursor: default; }
@@ -797,8 +776,7 @@ button { cursor: pointer; }
 
 /* ========================= 11. dark theme ================================ */
 
-/* Dark mode swaps the neutral tokens and the accent triples. Components
-   reference tokens only, so no other rule needs a dark variant. */
+/* Dark mode swaps neutral tokens and accent triples; components use tokens only. */
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #0b1120;
@@ -832,8 +810,7 @@ button { cursor: pointer; }
 
 /* ========================= 12. reduced motion ============================ */
 
-/* Honour the OS accessibility setting: kill transitions/animations globally,
-   with the odometer reel singled out because it would otherwise still slide. */
+/* Kill transitions/animations globally; the odometer reel is singled out. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     scroll-behavior: auto !important;

@@ -1,27 +1,11 @@
-// ---------------------------------------------------------------------------
-// Cloak — main-world interceptor (intercept.js)
-//
-// ROLE IN THE ARCHITECTURE
-//   content.js (isolated world) ──postMessage──▶ this file (main world)
-//        │                                          │
-//        │  CLOAK_CONFIG / CLOAK_CLEAR_MEMORY       │  rewrites fetch + XHR
-//        ◀──────────────────────────────────────────│  before the AI request
-//        │  CLOAK_MASKED_DATA / CLOAK_REQUEST_STATS │  leaves the browser
-//        ▼                                          ▼
-//   chrome.storage.local (vault)          Gemini / ChatGPT / Claude servers
-//
-// This file is bundled with esbuild (npm run build:interceptor) into
-// intercept.bundle.js, which the manifest injects into the MAIN world of every
-// supported chat site at document_start. The main world is required because it
-// is the only place a content script can reach the page's own fetch/XHR.
-//
-// PRIVACY INVARIANT
-//   Nothing in this file talks to the network on Cloak's behalf. It only
-//   rewrites traffic the page was already going to send, and restores tokens
-//   from replies the page was already going to receive.
-// ---------------------------------------------------------------------------
-const nlp = require('compromise');       // local NLP: person/place recognition
-const parseAddress = require('addressit'); // local street-address parser
+// Cloak — main-world interceptor: masks outgoing prompts, restores tokens
+// in incoming replies. Injected into the MAIN world of the supported chat
+// sites (see manifest) — the only place a content script can reach the
+// page's own fetch/XHR. Bundled into intercept.bundle.js via `npm run build:interceptor`.
+// Rewrites traffic the page was already sending; never talks to the network
+// on Cloak's behalf.
+const nlp = require('compromise');
+const parseAddress = require('addressit');
 
 (function (root) {
   'use strict';
@@ -60,6 +44,28 @@ const parseAddress = require('addressit'); // local street-address parser
   // count=2&ofs=0&req0___data__=<base64>&req1___data__=<base64>.
   const GEMINI_RPC_FORM_PATTERN = /^count=\d+&ofs=\d+&req\d+___data__=/;
 
+  // ---- Cloak reveal protocol (consent flow — PARKED FOR v2) ----------------
+  // The notice append (rewriteBody) and the reply scanner (response paths)
+  // are unwired for the store submission: the scanner held stream tails
+  // waiting for the magic sentence and froze Gemini mid-stream. The pieces
+  // below stay defined and unit-tested so v2 can re-attach them.
+  const REVEAL_HEAD = 'Requesting access to know ';
+  const REVEAL_TAIL = ' from Cloak';
+  // The reply line Cloak looks for, tolerant of markdown wrappers, leading
+  // whitespace, and trailing punctuation.
+  const REVEAL_LINE_PATTERN = /^[ \t]*[*_`]{0,3}[ \t]*Requesting access to know (\[(?:PERSON|ADDRESS|EMAIL|PHONE|CUSTOM)_\d+_[a-z0-9-]+\]) from Cloak[.!?,;]*[*_`]{0,3}[ \t]*$/i;
+  // Any masked token — used to find the prompt field that needs the notice.
+  const TOKEN_PATTERN = /\[(?:PERSON|ADDRESS|EMAIL|PHONE|CUSTOM)_\d+_[a-z0-9-]+\]/;
+  const REVEAL_INSTRUCTION = `[Cloak privacy notice] Values shown in square brackets like [EMAIL_1_ab12cd] are placeholders inserted by the Cloak browser extension on the user's device; the real values were never sent to you. If you need a specific placeholder's real value to complete this request, reply with ONE line in exactly this format and nothing else:
+${REVEAL_HEAD}<PLACEHOLDER>${REVEAL_TAIL}
+Cloak will ask the user for consent and, if granted, will resend this conversation with the real value filled in. Do not request access unless the value is truly required to finish the task.`;
+  // Detects a prompt that already carries the notice (re-sends stay single-notice).
+  const NOTICE_MARKER = '[Cloak privacy notice]';
+  // The reply sentence, in either the raw token or the restored value form
+  // (restoration runs first on both response paths). /gi, used only through
+  // matchAll/replace — both reset lastIndex — so one instance is safe.
+  const REVEAL_MAGIC_PATTERN = /[*_`]*[ \t]*Requesting access to know (.+?) from Cloak[.!?,;]*[*_`]{0,3}[ \t]*/gi;
+
   // ---- Small helpers ------------------------------------------------------
 
   // Make a literal safe to embed in a RegExp (".", "(" etc. must stay literal).
@@ -69,26 +75,25 @@ const parseAddress = require('addressit'); // local street-address parser
 
   // ---- Name detection -----------------------------------------------------
 
-  // Gather every plausible name string in the prompt, longest first so longer
-  // names are masked before their shorter substrings can be claimed.
+  // All plausible name strings in the prompt, longest first so longer names
+  // mask before their substrings can be claimed.
   function personCandidates(text) {
     const candidates = new Set();
-    // Pass 1: compromise's people() model — trained, broad, but imperfect.
+    // Pass 1: NLP model output.
     try {
       for (const name of nlp(text).people().out('array')) {
         if (typeof name !== 'string') continue;
-        // NLP output can arrive wrapped in punctuation; strip it back off.
         const cleaned = name.replace(/^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu, '').trim();
         if (cleaned) candidates.add(cleaned);
       }
     } catch {
-      // Contextual extraction below remains available if the NLP pass fails.
+      // Passes 2 and 3 still run.
     }
 
     // Pass 2: "my name is …" / "I'm …" introductions.
     for (const match of text.matchAll(PERSON_INTRODUCER)) {
       const words = match[1].trim().split(/\s+/);
-      // Trim trailing stopwords so "bob and my phone" yields just "bob".
+      // Drop trailing stopwords so "bob and my phone" yields "bob".
       while (words.length > 1 && NAME_STOPWORDS.has(words.at(-1).toLowerCase())) words.pop();
       if (words.length && !NAME_STOPWORDS.has(words[0].toLowerCase())) candidates.add(words.join(' '));
     }
@@ -96,7 +101,7 @@ const parseAddress = require('addressit'); // local street-address parser
     // Pass 3: "to <recipient> at <email>" slots in letter-writing prompts.
     for (const match of text.matchAll(RECIPIENT_CUE)) {
       const recipient = match[1].trim();
-      // Skip if the slot already holds a token (rewritten text is re-scanned).
+      // Skip slots that already hold a token (text is re-scanned).
       if (!recipient || recipient.includes('[')) continue;
       let recognized = [];
       try {
@@ -136,10 +141,9 @@ const parseAddress = require('addressit'); // local street-address parser
   // ---- Address detection --------------------------------------------------
 
   // Grow an address past its street portion to swallow city / state / postal
-  // code, so "221B Baker Street, London NW1 6XE" masks as ONE value instead of
-  // leaking its postal code.
+  // code, so the whole address masks as ONE value.
   function extendAddressSpan(candidate, parsed, streetEnd) {
-    // Step 1: find place names (cities) the parser recognised after the street.
+    // Cities the parser recognised after the street.
     const placeMatches = [];
     for (const region of parsed.regions || []) {
       let places = [];
@@ -271,11 +275,8 @@ const parseAddress = require('addressit'); // local street-address parser
 
   // ---- Token minting ------------------------------------------------------
 
-  // Deterministic per value: the same detected value always yields the same
-  // token suffix, across page loads and reinjections. The vault is keyed by
-  // token, so a random per-load id would grow a fresh entry for the same value
-  // on every navigation — this hash is what keeps the vault deduplicated.
-  // djb2: a 30-year-old string hash; short, fast, and good enough for 36-bit ids.
+  // Deterministic 6-char hash: the same value always maps to the same token,
+  // so the vault stays deduped across page loads (djb2).
   function stableSuffixFor(value) {
     let h = 5381;
     for (let i = 0; i < value.length; i += 1) h = ((h * 33) ^ value.charCodeAt(i)) >>> 0;
@@ -283,8 +284,7 @@ const parseAddress = require('addressit'); // local street-address parser
     return h.toString(36).padStart(6, '0').slice(-6);
   }
 
-  // The masker is the heart of Cloak: one instance per page load, holding the
-  // token↔value maps, the masking rules, and the response-restoration logic.
+  // One masker per page load: token↔value maps, masking rules, restoration.
   function createMasker() {
     let settings = { ...DEFAULT_SETTINGS };
     let enabled = true;
@@ -293,10 +293,10 @@ const parseAddress = require('addressit'); // local street-address parser
     const originalToToken = new Map(); // dedupe direction: value → token
     const suffixIndex = new Map();     // hash suffix → display index ([PERSON_1_…])
     const pendingEntries = [];         // new vault rows waiting to be reported
+    const consented = new Set();       // tokens the user APPROVED sharing in clear text
     let sortedTokens = null;           // cached restore order (see restoreText)
 
-    // Mint (or reuse) the token for a value. Reuse is what stops the vault
-    // from growing: "bob" typed on ten pages is still one vault row.
+    // Mint (or reuse) the token for a value — reuse keeps the vault small.
     function register(category, original) {
       const existing = originalToToken.get(original);
       if (existing) return existing;
@@ -315,10 +315,17 @@ const parseAddress = require('addressit'); // local street-address parser
       return token;
     }
 
-    // Mask one plain string of prompt text. Order matters: custom terms first
-    // (user intent wins), then names, addresses, emails, phones — longest and
-    // most structural first so inner values are already tokens when later
-    // passes run.
+    // Mask one occurrence — unless the user consented to share this exact
+    // value (CLOAK_CONSENT), which passes through in clear text instead.
+    function substitute(category, original) {
+      const existing = originalToToken.get(original);
+      if (existing && consented.has(existing)) return original;
+      maskedCount += 1;
+      return register(category, original);
+    }
+
+    // Mask one prompt string. Order matters: custom terms first (user
+    // intent), then names, addresses, emails, phones.
     function maskText(value) {
       if (!enabled || typeof value !== 'string') return value;
       let text = value;
@@ -328,32 +335,21 @@ const parseAddress = require('addressit'); // local street-address parser
         : [];
       for (const term of customTerms) {
         const expression = new RegExp(`(?<![\\p{L}\\p{N}_])${escapeRegExp(term)}(?![\\p{L}\\p{N}_])`, 'giu');
-        text = text.replace(expression, (match) => {
-          maskedCount += 1;
-          return register('CUSTOM', match);
-        });
+        text = text.replace(expression, (match) => substitute('CUSTOM', match));
       }
       if (settings.names) {
         // Spans are right-to-left, so splicing never shifts later offsets.
         for (const span of findPersonSpans(text)) {
-          maskedCount += 1;
-          text = `${text.slice(0, span.start)}${register('PERSON', span.value)}${text.slice(span.end)}`;
+          text = `${text.slice(0, span.start)}${substitute('PERSON', span.value)}${text.slice(span.end)}`;
         }
       }
       if (settings.addresses) {
         for (const span of findAddressSpans(text)) {
-          maskedCount += 1;
-          text = `${text.slice(0, span.start)}${register('ADDRESS', span.value)}${text.slice(span.end)}`;
+          text = `${text.slice(0, span.start)}${substitute('ADDRESS', span.value)}${text.slice(span.end)}`;
         }
       }
-      if (settings.emails) text = text.replace(EMAIL_PATTERN, (email) => {
-        maskedCount += 1;
-        return register('EMAIL', email);
-      });
-      if (settings.phones) text = text.replace(PHONE_PATTERN, (phone) => {
-        maskedCount += 1;
-        return register('PHONE', phone);
-      });
+      if (settings.emails) text = text.replace(EMAIL_PATTERN, (email) => substitute('EMAIL', email));
+      if (settings.phones) text = text.replace(PHONE_PATTERN, (phone) => substitute('PHONE', phone));
       return text;
     }
 
@@ -382,13 +378,13 @@ const parseAddress = require('addressit'); // local street-address parser
       return value;
     }
 
-    // Entry point for outgoing bodies. Handles the wire formats the three
-    // supported providers actually use: form-encoded and JSON — plus
-    // Gemini's processSession shape (base64 protobuf form parts), which is
-    // detected by body pattern because Google sometimes omits Content-Type.
+    // Entry point for outgoing bodies: Gemini's processSession protobuf form
+    // (detected by body pattern — Google sometimes omits Content-Type), then
+    // generic form-encoded, JSON, and plain text. Masking always runs first;
+    // when something was masked, the reveal notice rides along (max one).
     function rewriteBody(body, contentType = '') {
       if (typeof body !== 'string') throw new TypeError('PromptMask requires a textual request body');
-      maskedCount = 0; // each rewrite starts a fresh count for the stats message
+      maskedCount = 0; // fresh count per request, read via takeMaskedCount()
       if (GEMINI_RPC_FORM_PATTERN.test(body)) {
         const params = new URLSearchParams(body);
         for (const key of [...new Set(params.keys())]) {
@@ -401,7 +397,11 @@ const parseAddress = require('addressit'); // local street-address parser
             continue; // not base64 — leave the part alone
           }
           const mapped = mapProtobufProse(bytes, (text) => maskText(text));
-          if (mapped.changed) params.set(key, encodeBase64Flexible(mapped.bytes, isUrlSafeBase64(original)));
+          if (mapped.changed) {
+            // v2: the reveal notice (amendLastProseWithInstruction) re-attaches
+            // here when the consent workflow ships.
+            params.set(key, encodeBase64Flexible(mapped.bytes, isUrlSafeBase64(original)));
+          }
         }
         return params.toString();
       }
@@ -411,17 +411,16 @@ const parseAddress = require('addressit'); // local street-address parser
         return params.toString();
       }
       try {
+        // v2: amendTreeWithInstruction re-attaches here for the notice.
         return JSON.stringify(rewriteValue(JSON.parse(body)));
       } catch {
-        // Not JSON — mask the whole thing as plain prompt text.
+        // Not JSON — mask the whole body as plain text.
         return maskText(body);
       }
     }
 
-    // Swap tokens back to their originals. Longest tokens first so a token
-    // that contains another token's text can never be clobbered early. The
-    // order is cached: streaming readers call this once per network chunk,
-    // and re-sorting the whole vault every time is measurable jank.
+    // Swap tokens back to originals, longest first so a token inside another
+    // token's text can't be clobbered. Cached: runs once per network chunk.
     function restoreText(value) {
       sortedTokens ??= [...tokenToOriginal.keys()].sort((a, b) => b.length - a.length);
       let text = value;
@@ -451,9 +450,20 @@ const parseAddress = require('addressit'); // local street-address parser
       clear() {
         tokenToOriginal.clear();
         originalToToken.clear();
+        consented.clear();
         sortedTokens = null;
         pendingEntries.length = 0;
       },
+      // User clicked "Share" on the consent dialog: this token's real value
+      // may now travel in clear text for subsequent requests.
+      grantConsent(token) {
+        if (tokenToOriginal.has(token)) consented.add(token);
+      },
+      // Look up the real value behind a token (used to build the consent UI).
+      originalFor: (token) => tokenToOriginal.get(token) || '',
+      // Reverse lookup for reveal requests captured after restoration —
+      // they arrive carrying the value, not the token.
+      tokenFor: (original) => originalToToken.get(original) || '',
       hasMappings: () => tokenToOriginal.size > 0,
       shouldRestoreResponses: () => settings.restoreResponses !== false,
       activeCategories: () => ['names', 'emails', 'phones', 'addresses'].filter((category) => settings[category] !== false),
@@ -768,6 +778,216 @@ const parseAddress = require('addressit'); // local street-address parser
     return `${protoTextEncoder.encode(json).length}\n${json}`;
   }
 
+  // ---- Reveal protocol: prompt notice + reply scanner ----------------------
+
+  // Append REVEAL_INSTRUCTION to the LAST prose field holding a token — in
+  // Gemini's wire format that is the newest prompt. The tree is rebuilt
+  // bottom-up so every length prefix stays correct.
+  function amendLastProseWithInstruction(bytes) {
+    const fields = parseProtobuf(bytes);
+    if (!fields) return { bytes, changed: false };
+    // Find the target as an index PATH ([0,1,0] = field 0 → sub 1 → sub 0).
+    // The rebuild pass re-parses the buffer, so it gets different entry
+    // objects — identity comparison would silently miss nested prompts.
+    let target = null;
+    const findTarget = (list, path) => {
+      for (let index = 0; index < list.length; index += 1) {
+        const entry = list[index];
+        if (entry.wireType !== 2) continue;
+        const sub = parseProtobuf(entry.bytes);
+        // A real submessage keeps its token text one level deeper.
+        if (sub && sub.length) findTarget(sub, [...path, index]);
+        // Prompt strings can parse as messages too (a leading letter plus
+        // token digits mimics tags), so empty levels are re-checked as
+        // text: printable start + prose + token. LAST hit wins.
+        try {
+          const text = protoTextDecoder.decode(entry.bytes);
+          if (/^[^\u0000-\u001F\u007F]/.test(text) && looksLikeProse(text) && TOKEN_PATTERN.test(text)) {
+            target = { path: [...path, index], text };
+          }
+        } catch {
+          // Binary field, never a candidate.
+        }
+      }
+    };
+    findTarget(fields, []);
+    if (!target) return { bytes, changed: false };
+    // Already-noticed prompts are left alone (no stacked copies).
+    if (target.text.includes(NOTICE_MARKER)) return { bytes, changed: false };
+    // Rebuild along the path; every ancestor is re-serialized with
+    // corrected length prefixes.
+    const amendedBytes = protoTextEncoder.encode(`${target.text}\n\n${REVEAL_INSTRUCTION}`);
+    const rebuild = (list, depth) => {
+      let changed = false;
+      const out = list.map((entry, index) => {
+        const onPath = index === target.path[depth];
+        if (onPath && depth === target.path.length - 1) {
+          changed = true; // the leaf itself — swap in the amended text
+          return { field: entry.field, wireType: 2, bytes: amendedBytes };
+        }
+        if (onPath && entry.wireType === 2) {
+          const sub = parseProtobuf(entry.bytes);
+          if (sub && sub.length) {
+            const next = rebuild(sub, depth + 1);
+            if (next.changed) {
+              changed = true;
+              return { field: entry.field, wireType: 2, bytes: serializeProtobuf(next.fields) };
+            }
+          }
+        }
+        return entry;
+      });
+      return { fields: out, changed };
+    };
+    const rebuilt = rebuild(fields, 0);
+    if (!rebuilt.changed) return { bytes, changed: false };
+    return { bytes: serializeProtobuf(rebuilt.fields), changed: true };
+  }
+
+  // ---- Notice helpers for the non-protobuf wire shapes --------------------
+  // ChatGPT/Claude speak JSON, Gemini's other flows speak plain or
+  // embedded-JSON form fields. Same contract as the protobuf path: mask
+  // first, notice the last token-bearing prose string, one per request,
+  // idempotent.
+
+  // Append the notice to one prose string — only when it holds a token and
+  // doesn't already carry a notice.
+  function amendProseString(text) {
+    if (typeof text !== 'string') return text;
+    if (!TOKEN_PATTERN.test(text) || !looksLikeProse(text) || text.includes(NOTICE_MARKER)) return text;
+    return `${text}\n\n${REVEAL_INSTRUCTION}`;
+  }
+
+  // Find the last token-bearing prose string inside a parsed JSON value and
+  // append the notice ("last wins" = newest prompt in a messages array).
+  // Embedded JSON strings (Gemini's double-encoded f.req) are recursed into,
+  // never amended as raw text — that would glue the notice after the JSON.
+  // Containers write through to their setter after visiting children, so a
+  // parsed embedded level re-stringifies upward AFTER the winner is swapped.
+  function amendTreeWithInstruction(root) {
+    let slot = null; // current winner: { set, original }; a later candidate
+    //                 reverts it first, so exactly one notice ever lands
+    let changed = false;
+    let top = null;  // replacement for root, when root itself is a string
+    const visit = (value, setter) => {
+      if (typeof value === 'string') {
+        // Embedded JSON structure — walk inside instead of treating it as prose.
+        if (/^[[{]/.test(value.trimStart())) {
+          try {
+            const inner = JSON.parse(value);
+            if (inner && typeof inner === 'object') {
+              visit(inner, (next) => setter(JSON.stringify(next)));
+              return;
+            }
+          } catch {
+            // Not JSON after all — prose candidate below.
+          }
+        }
+        if (TOKEN_PATTERN.test(value) && looksLikeProse(value)) {
+          const amended = amendProseString(value);
+          if (amended !== value) {
+            if (slot) slot.set(slot.original); // last wins: undo the earlier candidate
+            slot = { set: setter, original: value };
+            setter(amended);
+            changed = true;
+          }
+        }
+        return;
+      }
+      if (Array.isArray(value)) {
+        value.forEach((item, index) => visit(item, (next) => { value[index] = next; }));
+        setter(value); // no-op for plain parents, re-stringifies embedded ones
+        return;
+      }
+      if (value && typeof value === 'object') {
+        for (const key of Object.keys(value)) visit(value[key], (next) => { value[key] = next; });
+        setter(value);
+      }
+    };
+    visit(root, (next) => { top = next; });
+    return { value: top === null ? root : top, changed };
+  }
+
+  // One form-encoded value: a string, possibly embedded JSON — the tree
+  // walk handles both; the result goes back as a string.
+  function amendValueString(value) {
+    return amendTreeWithInstruction(value).value;
+  }
+
+  // Response-side scanner: hides Gemini's access-request sentence from the
+  // page and reports the value it asked for. The sentence arrives with the
+  // raw token or the restored value — install() resolves the shape.
+  //
+  // Append-only (Gemini's reader tracks offsets): feed() only ever appends
+  // to `display`. Complete lines extract immediately; the trailing partial
+  // is scanned in place, then everything before the last possibly-
+  // incomplete sentence ships and the suspect suffix waits for more bytes.
+  function createRevealScanner(onReveal) {
+    let display = ''; // committed text — always safe to deliver, append-only
+    let hold = '';    // unresolved tail (possible partial magic sentence)
+    // Private /gi copy — matchAll/replace never leak lastIndex state anyway.
+    const magicSentence = new RegExp(REVEAL_MAGIC_PATTERN.source, 'gi');
+    // Strip every completed magic sentence, reporting what it captured.
+    const extractMagic = (text) => {
+      if (!/Requesting access to know/i.test(text)) return text; // cheap reject
+      for (const hit of [...text.matchAll(magicSentence)]) onReveal(hit[1]);
+      return text.replace(magicSentence, '');
+    };
+    // True while `text` may end mid-sentence: head present or the tail is
+    // itself a prefix of the head.
+    const startsOrBuildsHead = (text) => {
+      const lower = text.toLowerCase();
+      const headLower = REVEAL_HEAD.toLowerCase();
+      const at = lower.lastIndexOf(headLower);
+      if (at !== -1) return true; // head present — sentence may be incomplete
+      // Longest suffix of the text that is a proper prefix of the head.
+      const max = Math.min(text.length, headLower.length - 1);
+      for (let len = max; len > 0; len -= 1) {
+        if (headLower.startsWith(lower.slice(lower.length - len))) return true;
+      }
+      return false;
+    };
+    const feed = (chunk, transferFinished) => {
+      hold += chunk;
+      // 1. Complete lines: newline proves the line is final — extract
+      //    whatever magic it holds and ship the rest.
+      for (;;) {
+        const newline = hold.indexOf('\n');
+        if (newline === -1) break;
+        display += `${extractMagic(hold.slice(0, newline))}\n`;
+        hold = hold.slice(newline + 1);
+      }
+      // 2. Trailing partial, no newline yet.
+      if (transferFinished) {
+        display += extractMagic(hold); // stream over — flush the tail
+        hold = '';
+      } else {
+        hold = extractMagic(hold); // completed sentences (frame-embedded) fire now
+        const at = hold.toLowerCase().lastIndexOf(REVEAL_HEAD.toLowerCase());
+        const cut = at !== -1
+          ? at // hold from the last full head — the sentence may be incomplete
+          : startsOrBuildsHead(hold) ? headCut(hold) : hold.length;
+        if (cut > 0) {
+          display += hold.slice(0, cut);
+          hold = hold.slice(cut);
+        }
+      }
+      return display;
+    };
+    // Start index of the suffix that is (a prefix of) the head — the point
+    // past which bytes must wait for the rest of the sentence.
+    const headCut = (text) => {
+      const lower = text.toLowerCase();
+      const headLower = REVEAL_HEAD.toLowerCase();
+      const max = Math.min(text.length, headLower.length - 1);
+      for (let len = max; len > 0; len -= 1) {
+        if (headLower.startsWith(lower.slice(lower.length - len))) return text.length - len;
+      }
+      return text.length;
+    };
+    return { feed };
+  }
+
   // ---- Page wiring --------------------------------------------------------
 
   // Runs in a chat page's main world. Wraps fetch and XHR so every outgoing
@@ -789,6 +1009,18 @@ const parseAddress = require('addressit'); // local street-address parser
       if (event.data.type === 'CLOAK_CLEAR_MEMORY') {
         masker.clear();
         root.console?.info('[PromptMask] Local token vault cleared.');
+      }
+      // The user answered the consent dialog: "Share" lets this one value
+      // travel in clear text from now on; "Don't share" changes nothing
+      // (the value stays masked) — the content script's follow-up message
+      // tells Gemini which happened.
+      if (event.data.type === 'CLOAK_CONSENT' && event.data.token) {
+        if (event.data.granted) {
+          masker.grantConsent(event.data.token);
+          root.console?.info(`[Cloak] User approved sharing ${event.data.token} with the AI in clear text.`);
+        } else {
+          root.console?.info(`[Cloak] User declined to share ${event.data.token}; it stays masked.`);
+        }
       }
     });
 
@@ -959,6 +1191,10 @@ const parseAddress = require('addressit'); // local street-address parser
       // frame is parsed, restored from the inside out, and re-emitted with a
       // corrected length prefix while partial frames are held (or flushed at
       // readyState 4).
+      // v2 note: the reveal scanner + frame strip that used to run here are
+      // parked with the consent workflow. They held back stream tails waiting
+      // for a "Requesting access to know…" sentence that never arrived, which
+      // froze Gemini mid-stream. Restoration is now pure append-only.
       const installResponseGetters = (xhr, geminiRpc) => {
         const responseType = xhr.responseType || '';
         const streamed = { delivered: '', restored: '' };
@@ -1043,6 +1279,8 @@ const parseAddress = require('addressit'); // local street-address parser
               }
               break;
             }
+            // Restore tokens inside the frame's prose (v2: the reveal strip
+            // re-attaches here with the consent workflow).
             out += restoreRpcChunk(lengthText, raw.slice(frameStart, frameStart + frameLength), (text) => masker.restoreText(text));
             position = frameStart + frameLength;
           }
@@ -1140,7 +1378,17 @@ const parseAddress = require('addressit'); // local street-address parser
 
   // Node (the test suite) gets the internals via module.exports.
   if (typeof process !== 'undefined' && process.versions?.node && typeof module !== 'undefined') {
-    module.exports = { containsMediaIntent, createMasker, isTargetRequest, restoreStream };
+    module.exports = {
+      containsMediaIntent,
+      createMasker,
+      isTargetRequest,
+      restoreStream,
+      // Reveal protocol pieces (consent flow) — unit-tested directly.
+      createRevealScanner,
+      amendLastProseWithInstruction,
+      REVEAL_INSTRUCTION,
+      REVEAL_LINE_PATTERN
+    };
   }
 
   // Same bundle, two deployment contexts:

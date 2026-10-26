@@ -1,19 +1,8 @@
-// ---------------------------------------------------------------------------
-// Cloak — test suite (tests/intercept.test.js)
-//
-// Runs on Node's built-in test runner (node --test) — no framework, no
-// network, no real browser. `npm test` rebuilds intercept.bundle.js first so
-// the suite always exercises the artifact the extension actually ships.
-//
-// Two levels of testing:
-//   1. Unit      — createMasker / isTargetRequest / containsMediaIntent /
-//                  restoreStream called directly (fast, precise).
-//   2. Integration — the minified bundle loaded into a fake page window via
-//                  node:vm, with a stubbed fetch or XMLHttpRequest. This is
-//                  how the real MAIN-world wiring is verified: config
-//                  messages, request rewriting, response restoration, and the
-//                  CloakPreview contract used by the popup's "Try it" tab.
-// ---------------------------------------------------------------------------
+// Cloak — test suite. Node's built-in runner (node --test); `npm test`
+// rebuilds intercept.bundle.js first so the suite always exercises the
+// shipped artifact. Unit tests call the intercept.js exports directly;
+// integration tests load the bundle into a fake page window (node:vm) with
+// stubbed fetch/XHR to verify the real MAIN-world wiring.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -23,8 +12,26 @@ const {
   containsMediaIntent,
   createMasker,
   isTargetRequest,
-  restoreStream
+  restoreStream,
+  // Reveal protocol (consent flow): notice injection + reply scanner.
+  createRevealScanner,
+  amendLastProseWithInstruction,
+  REVEAL_INSTRUCTION,
+  REVEAL_LINE_PATTERN
 } = require('../intercept.js');
+
+// v2 note: the reveal-notice append is parked with the consent workflow, so
+// masked prompts ship WITHOUT any notice. `withoutNotice` stays as a safety
+// pass-through (older vaulted bodies could carry one); `assertNoNotice`
+// replaces the old `assertNoticed` and pins the disabled state.
+function withoutNotice(text) {
+  if (typeof text !== 'string' || !text.endsWith(REVEAL_INSTRUCTION)) return text;
+  return text.slice(0, text.length - REVEAL_INSTRUCTION.length).replace(/\n+$/, '');
+}
+function assertNoNotice(text) {
+  assert.ok(typeof text === 'string' && !text.includes('[Cloak privacy notice]'),
+    'masked prompt must NOT carry the parked reveal notice');
+}
 
 // ---------------------------------------------------------------------------
 // Masking unit tests
@@ -41,8 +48,9 @@ test('masks names, emails, and phone numbers and restores them', () => {
   const payload = JSON.parse(masked);
   const text = payload.contents[0].parts[0].text;
 
-  assert.match(text, /^My name is \[PERSON_1_[a-z0-9-]+\]\. Email me at \[EMAIL_2_[a-z0-9-]+\] or call \[PHONE_3_[a-z0-9-]+\]\.$/i);
-  assert.equal(masker.restoreText(text), original);
+  assert.match(withoutNotice(text), /^My name is \[PERSON_1_[a-z0-9-]+\]\. Email me at \[EMAIL_2_[a-z0-9-]+\] or call \[PHONE_3_[a-z0-9-]+\]\.$/i);
+  assertNoNotice(text);
+  assert.equal(masker.restoreText(withoutNotice(text)), original);
   assert.deepEqual(masker.takePendingEntries().map(({ original }) => original), [
     'John Doe', 'john@example.com', '415-555-0137'
   ]);
@@ -141,7 +149,8 @@ test('recognizes generic person names and international address formats locally'
   assert.equal(entries[0].original, 'Dr. Noam Chomsky');
   assert.match(entries[1].original, /^221B Baker Street, London NW1 6XE, United Kingdom$/);
   assert.match(rewritten, /\[PERSON_1_[a-z0-9-]+\] at \[ADDRESS_2_[a-z0-9-]+\]\./i);
-  assert.equal(masker.restoreText(rewritten), original);
+  assertNoNotice(rewritten);
+  assert.equal(masker.restoreText(withoutNotice(rewritten)), original);
 });
 
 // US address with city/state/ZIP: the trailing sentence ("Please email soon.")
@@ -154,8 +163,9 @@ test('masks parsed US city state and ZIP without swallowing following prose', ()
 
   assert.equal(entries[0].original, 'Alex Kim');
   assert.equal(entries[1].original, '742 Evergreen Terrace, Springfield, IL 62704');
-  assert.equal(rewritten, `${entries[0].token} lives at ${entries[1].token}. Please email soon.`);
-  assert.equal(masker.restoreText(rewritten), original);
+  assert.equal(withoutNotice(rewritten), `${entries[0].token} lives at ${entries[1].token}. Please email soon.`);
+  assertNoNotice(rewritten);
+  assert.equal(masker.restoreText(withoutNotice(rewritten)), original);
 });
 
 // False-positive guard: bare numbers ("123 items") must NOT be treated as
@@ -182,7 +192,8 @@ test('masks custom names and phrases without built-in entity rules', () => {
   assert.match(prompt, /Juniperish/);
   assert.equal(entries[0].original, 'Project Juniper');
   assert.equal(entries[1].original, 'Mara');
-  assert.equal(masker.restoreText(prompt), original);
+  assertNoNotice(prompt);
+  assert.equal(masker.restoreText(withoutNotice(prompt)), original);
 });
 
 // Gemini's wire format: a form-encoded body whose f.req field holds JSON
@@ -196,7 +207,8 @@ test('rewrites Gemini f.req form payloads containing nested JSON', () => {
   const outerPayload = JSON.parse(new URLSearchParams(rewrittenBody).get('f.req'));
   const rewrittenInner = JSON.parse(outerPayload[1]);
 
-  assert.match(rewrittenInner[0][0], /^Contact \[EMAIL_1_[a-z0-9-]+\]$/i);
+  assert.match(withoutNotice(rewrittenInner[0][0]), /^Contact \[EMAIL_1_[a-z0-9-]+\]$/i);
+  assertNoNotice(rewrittenInner[0][0]);
   assert.equal(masker.takePendingEntries()[0].original, 'john@example.com');
 });
 
@@ -295,8 +307,10 @@ test('respects per-category settings', () => {
   const masker = createMasker();
   masker.configure({ enabled: true, settings: { names: false, emails: true, phones: false, addresses: false } });
   const masked = masker.rewriteBody(JSON.stringify({ text: 'My name is John Doe, email john@example.com, phone 415-555-0137, address 123 Reedy Creek Ln' }));
+  const text = JSON.parse(masked).text;
 
-  assert.match(JSON.parse(masked).text, /^My name is John Doe, email \[EMAIL_1_[a-z0-9-]+\], phone 415-555-0137, address 123 Reedy Creek Ln$/i);
+  assert.match(withoutNotice(text), /^My name is John Doe, email \[EMAIL_1_[a-z0-9-]+\], phone 415-555-0137, address 123 Reedy Creek Ln$/i);
+  assertNoNotice(text);
 });
 
 // The "Restore replies" preference in Settings maps to this flag; the fetch
@@ -317,12 +331,8 @@ test('detects media intent in URL-encoded request bodies', () => {
 // Integration tests — the real bundle in a fake page window
 // ---------------------------------------------------------------------------
 
-// Each integration test follows the same recipe:
-//   1. build a fake page window (location, fetch/XHR stubs, message sink)
-//   2. run intercept.bundle.js in node:vm with that window
-//   3. deliver a CLOAK_CONFIG message (what content.js would send)
-//   4. fire a request through the wrapped fetch/XHR
-//   5. assert on the transmitted body, the restored reply, and the messages
+// Integration recipe: fake page window → run the bundle in node:vm → deliver
+// CLOAK_CONFIG → fire fetch/XHR → assert on transmitted body and reply.
 
 // End-to-end Gemini: a real f.req payload is masked on the way out, the mock
 // server echoes the tokens back, and the response is restored before the page
@@ -983,7 +993,9 @@ test('keeps submessage nesting when the length byte is printable', () => {
   assert.equal(maskedPrompt.includes('415-555-0199'), false);
   // The corruption signature: stale structure bytes swallowed into the text.
   assert.equal(maskedPrompt.includes('\n~'), false);
-  assert.equal(masker.restoreText(maskedPrompt), prompt);
+  // The prompt restores exactly, and (v2-parked) carries NO reveal notice.
+  assert.equal(masker.restoreText(maskedPrompt).startsWith(prompt), true);
+  assertNoNotice(maskedPrompt);
 });
 
 // The frame-aware response path is per-XHR-instance bundle wiring, so this
@@ -1225,4 +1237,422 @@ test('installs interception on chat pages and keeps CloakPreview private', () =>
 
   assert.notEqual(pageWindow.fetch, nativeFetch, 'chat pages must get the wrapped fetch');
   assert.equal(pageWindow.CloakPreview, undefined, 'the preview factory must not leak into chat pages');
+});
+
+// ---------------------------------------------------------------------------
+// Reveal protocol (consent flow) — PARKED FOR v2. The notice append and the
+// reply scanner are unwired from rewriteBody/response paths (the scanner
+// held stream tails and froze Gemini mid-stream); their building blocks
+// stay exported and unit-tested below so v2 can re-attach them.
+// ---------------------------------------------------------------------------
+
+// Masked prompts now ship WITHOUT the notice — only the token swap.
+test('does not append the reveal notice to masked prompts (parked for v2)', () => {
+  const masker = createMasker();
+  const sessionPart = buildSessionPart();
+  const prompt = 'My name is John Doe and my email is tester@example.test — book it for me.';
+  const body = `count=2&ofs=0&req0___data__=${Buffer.from(sessionPart).toString('base64')}&req1___data__=${Buffer.from(buildUserPart(prompt)).toString('base64')}`;
+  const rewritten = masker.rewriteBody(body, '');
+  const params = new URLSearchParams(rewritten);
+
+  // Session metadata still ships byte-identical.
+  assert.equal(params.get('req0___data__'), Buffer.from(sessionPart).toString('base64'));
+
+  const sentText = Buffer.from(params.get('req1___data__'), 'base64').toString('utf8');
+  assertNoNotice(sentText);
+  assert.match(REVEAL_INSTRUCTION, /Requesting access to know <PLACEHOLDER> from Cloak/); // v2 copy stays intact
+  // Masking itself is unchanged: the count is the PII hits and the
+  // originals are gone from the wire.
+  assert.equal(masker.takeMaskedCount(), 2);
+  assert.equal(sentText.includes('John Doe'), false);
+  assert.equal(sentText.includes('tester@example.test'), false);
+});
+
+// No PII → no tokens → the prompt ships byte-identical.
+test('omits the reveal notice when the prompt contains no tokens', () => {
+  const masker = createMasker();
+  const prompt = 'What is the boiling point of water at sea level?';
+  const body = `count=1&ofs=0&req0___data__=${Buffer.from(buildUserPart(prompt)).toString('base64')}`;
+  const rewritten = masker.rewriteBody(body, '');
+  const sentText = Buffer.from(new URLSearchParams(rewritten).get('req0___data__'), 'base64').toString('utf8');
+
+  assert.equal(sentText.includes('Cloak privacy notice'), false);
+  assert.equal(sentText.includes(prompt), true); // prompt untouched
+  assert.equal(masker.takeMaskedCount(), 0);
+});
+
+// Direct unit test of the (parked) amender, kept green for v2: rebuilds the
+// protobuf tree bottom-up so every length prefix stays correct. Targets the
+// LAST token-bearing field — in Gemini's wire format that is the newest
+// prompt.
+test('amends the last token-bearing protobuf field with corrected lengths', () => {
+  // Field 1: prose without tokens (left alone). Field 2: token-bearing —
+  // both chosen so their leading bytes cannot parse as a nested message.
+  const bytes = Uint8Array.from([
+    ...encStringField(1, 'no tokens in this field'),
+    ...encStringField(2, 'Send this to [EMAIL_1_ab12cd] today')
+  ]);
+  const result = amendLastProseWithInstruction(bytes);
+  assert.equal(result.changed, true);
+
+  // Strict structural walk of the rewritten bytes: both fields still parse,
+  // field 1 is untouched, field 2 carries the original text + the notice.
+  const fields = parseProtoStrict(result.bytes);
+  assert.ok(fields, 'amended buffer must still parse as protobuf');
+  const first = Buffer.from(fields.find(({ field }) => field === 1).bytes).toString('utf8');
+  const second = Buffer.from(fields.find(({ field }) => field === 2).bytes).toString('utf8');
+  assert.equal(first, 'no tokens in this field');
+  assert.equal(second, 'Send this to [EMAIL_1_ab12cd] today\n\n' + REVEAL_INSTRUCTION);
+
+  // No token anywhere → unchanged, byte-identical (the rewriteBody gate
+  // relies on `changed: false` to skip re-encoding).
+  const plain = Uint8Array.from(encStringField(1, 'no tokens in this field'));
+  const untouched = amendLastProseWithInstruction(plain);
+  assert.equal(untouched.changed, false);
+  assert.deepEqual([...untouched.bytes], [...plain]);
+});
+
+// Re-sending an already-noticed prompt (pasted history, retry) must not
+// stack a second copy: amendProseString refuses strings carrying the marker.
+test('amending an already-noticed protobuf field is a no-op', () => {
+  const bytes = Uint8Array.from(encStringField(1, 'Send this to [EMAIL_1_ab12cd] today'));
+  const first = amendLastProseWithInstruction(bytes);
+  assert.equal(first.changed, true);
+  const second = amendLastProseWithInstruction(first.bytes);
+  assert.equal(second.changed, false);
+  assert.deepEqual([...second.bytes], [...first.bytes]);
+});
+
+// ---------------------------------------------------------------------------
+// Wire shapes (JSON / form / plain text): masking only, no notice (v2-parked)
+// ---------------------------------------------------------------------------
+
+// ChatGPT/Claude JSON: every prompt is masked; none gets a notice.
+test('JSON bodies mask all prompts without appending any notice', () => {
+  const masker = createMasker();
+  const body = JSON.stringify({
+    messages: [
+      { role: 'user', content: 'My name is Jane Roe' },
+      { role: 'assistant', content: 'Noted.' },
+      { role: 'user', content: 'Email me at jane@example.com please' }
+    ]
+  });
+  const out = JSON.parse(masker.rewriteBody(body, 'application/json'));
+  const [first, , last] = out.messages.map((entry) => entry.content);
+
+  assert.ok(first.includes('[PERSON_1_'), 'older prompt still masked');
+  assertNoNotice(first);
+  assert.ok(last.includes('[EMAIL_2_'), 'newest prompt still masked (counter is body-wide)');
+  assertNoNotice(last);
+});
+
+// A prompt that already carries a v2-era notice keeps exactly that one copy
+// (masking still runs; nothing appends a second).
+test('JSON bodies: an already-noticed prompt is never given a second notice', () => {
+  const masker = createMasker();
+  const input = `My name is Max Power\n\n${REVEAL_INSTRUCTION}`;
+  const out = JSON.parse(masker.rewriteBody(JSON.stringify({ prompt: input }), 'application/json'));
+
+  assert.ok(out.prompt.includes('[PERSON_1_'), 'masking still ran');
+  assert.equal(out.prompt.split('[Cloak privacy notice]').length - 1, 1);
+  assert.ok(out.prompt.endsWith(REVEAL_INSTRUCTION));
+});
+
+// Plain form-encoded values (Gemini's alternate flows): masked, no notice.
+test('plain form-encoded values are masked without the reveal notice', () => {
+  const masker = createMasker();
+  const params = new URLSearchParams({ prompt: 'my name is bob carter, email bob@example.com' });
+  const rewritten = masker.rewriteBody(params.toString(), 'application/x-www-form-urlencoded;charset=UTF-8');
+  const value = new URLSearchParams(rewritten).get('prompt');
+
+  assert.match(value, /\[PERSON_1_[a-z0-9-]+\]/i);
+  assertNoNotice(value);
+});
+
+// Regression for the f.req corruption: an embedded JSON value must stay
+// valid JSON after masking.
+test('embedded-JSON form values keep valid JSON after masking', () => {
+  const masker = createMasker();
+  const inner = JSON.stringify([['Contact john@example.com about it']]);
+  const body = new URLSearchParams({ 'f.req': JSON.stringify([null, inner]) }).toString();
+  const rewritten = masker.rewriteBody(body, 'application/x-www-form-urlencoded;charset=UTF-8');
+  const outer = JSON.parse(new URLSearchParams(rewritten).get('f.req'));
+  const nested = JSON.parse(outer[1]);
+
+  assert.ok(Array.isArray(outer), 'outer f.req still parses');
+  assert.ok(nested[0][0].includes('[EMAIL_1_'), 'token present');
+  assertNoNotice(nested[0][0]);
+});
+
+// Non-JSON, non-form bodies fall through to the plain-text path: whole body
+// masked, no notice appended.
+test('plain-text bodies get masked without the notice', () => {
+  const masker = createMasker();
+  const rewritten = masker.rewriteBody('my email is john@example.com ok', 'text/plain');
+
+  assert.match(rewritten, /\[EMAIL_1_[a-z0-9-]+\]/i);
+  assertNoNotice(rewritten);
+  assert.equal(masker.restoreText(rewritten), 'my email is john@example.com ok');
+});
+
+// Happy path of the reply side: Gemini follows the format, the scanner
+// fires exactly one report with the token, and the page (which streams the
+// returned string to its renderer) NEVER sees the request line.
+test('hides Gemini reveal lines and reports their token', () => {
+  const reported = [];
+  const scanner = createRevealScanner((captured) => reported.push(captured));
+  const reply = 'Sure — done!\nRequesting access to know [EMAIL_1_ab12cd] from Cloak\nAnything else?';
+
+  const delivered = scanner.feed(reply, false);
+  assert.deepEqual(reported, ['[EMAIL_1_ab12cd]']);
+  assert.equal(delivered.includes('Requesting access'), false);
+  assert.equal(delivered.includes('[EMAIL_1_ab12cd]'), false);
+  assert.match(delivered, /Sure — done!/); // surrounding prose still renders
+  assert.match(delivered, /Anything else\?/);
+});
+
+// Models decorate the line with markdown now and then; the exported line
+// pattern documents the tolerated drift (wrappers, punctuation, casing).
+test('recognizes the reveal line through markdown wrappers', () => {
+  assert.match('**Requesting access to know [PHONE_1_zz99qq] from Cloak.**', REVEAL_LINE_PATTERN);
+  assert.match('requesting access to know [PHONE_1_zz99qq] from cloak', REVEAL_LINE_PATTERN);
+  assert.equal(REVEAL_LINE_PATTERN.test('Requesting access to know more about that'), false);
+
+  // The scanner strips the decorated form whole and reports the token.
+  const reported = [];
+  const scanner = createRevealScanner((captured) => reported.push(captured));
+  const delivered = scanner.feed('**Requesting access to know [PHONE_1_zz99qq] from Cloak.**', false);
+  assert.deepEqual(reported, ['[PHONE_1_zz99qq]']);
+  assert.equal(delivered, ''); // the line was the entire message
+});
+
+// Post-restoration form: response text is restored BEFORE the scanner runs,
+// so the capture carries the clear value ("know <real email> from Cloak").
+// The scanner reports the capture as-is — install()'s handler maps it back
+// to its token via masker.tokenFor (covered by the XHR integration test).
+test('reports the restored value form of a reveal line', () => {
+  const reported = [];
+  const scanner = createRevealScanner((captured) => reported.push(captured));
+  const delivered = scanner.feed('Hi — Requesting access to know lucalogix12@gmail.com from Cloak — bye', false);
+
+  assert.deepEqual(reported, ['lucalogix12@gmail.com']);
+  assert.equal(delivered.includes('lucalogix12@gmail.com'), false);
+  assert.match(delivered, /Hi/);
+  assert.match(delivered, /bye/);
+});
+
+// Append-only, zero-lag contract: ordinary stream text must pass through
+// immediately (Gemini's reader tracks offsets — a committed prefix can never
+// be retracted), and nothing may fire without the magic sentence.
+test('streams ordinary reply text immediately and append-only', () => {
+  const reported = [];
+  const scanner = createRevealScanner(() => reported.push('fire'));
+
+  const first = scanner.feed('Hello there — here is ', false);
+  assert.equal(first, 'Hello there — here is ');
+  const second = scanner.feed('a plain continuation.', false);
+  assert.equal(second, 'Hello there — here is a plain continuation.');
+  const third = scanner.feed(' All done.', true);
+  assert.equal(third, 'Hello there — here is a plain continuation. All done.');
+  assert.equal(reported.length, 0);
+});
+
+// The core hold rule: a chunk ENDING mid-sentence must wait for its tail
+// (the split lands across network chunks all the time), then resolve —
+// fire once, strip the whole line, ship everything else.
+test('holds a partial reveal sentence across chunks until it completes', () => {
+  const reported = [];
+  const scanner = createRevealScanner((captured) => reported.push(captured));
+
+  // Chunk 1: the intro line has a newline → final, ships; the sentence
+  // fragment has none and builds the magic head → held, not delivered.
+  const first = scanner.feed('Sure!\nRequesting acc', false);
+  assert.equal(first, 'Sure!\n');
+  assert.deepEqual(reported, []);
+
+  // Chunk 2 completes the sentence → reported + removed; remainder ships.
+  const second = scanner.feed('ess to know [EMAIL_1_ab12cd] from Cloak\nok', false);
+  assert.deepEqual(reported, ['[EMAIL_1_ab12cd]']);
+  assert.equal(second, 'Sure!\n\nok');
+  assert.equal(second.includes('Requesting'), false);
+  assert.equal(second.includes('[EMAIL_1_ab12cd]'), false);
+});
+
+// The hold rule must never stall legitimate prose that merely LOOKS like the
+// start of the reveal line. The newline proves the line was abandoned → it
+// ships verbatim, nothing fires, and even an unfinished stream (no DONE yet)
+// unblocks as soon as that newline arrives.
+test('does not stall on prose that starts like the reveal line', () => {
+  const reported = [];
+  const scanner = createRevealScanner(() => reported.push('fire'));
+
+  // No newline after the lookalike yet → held (it could still become real).
+  const first = scanner.feed('I would like.\nRequesting access to know more', false);
+  assert.equal(first, 'I would like.\n');
+
+  // The newline settles it: prose, not a reveal → ships whole, zero fires.
+  const second = scanner.feed(' details.\nDone!\n', false);
+  assert.equal(second, 'I would like.\nRequesting access to know more details.\nDone!\n');
+  assert.deepEqual(reported, []);
+});
+
+// Consent gate on the masker: after the user clicks Share, THAT value
+// travels in clear text on follow-up requests (so Gemini can actually act
+// on it), while everything else keeps masking — and the shared value does
+// not inflate the per-request "masked values" stat.
+test('lets consented values pass through in clear text', () => {
+  const masker = createMasker();
+  const first = masker.maskText('Email lucalogix12@gmail.com today');
+  const token = first.match(/\[EMAIL_[^\]]+\]/)[0];
+  assert.equal(first.includes('lucalogix12@gmail.com'), false);
+  assert.equal(masker.takeMaskedCount(), 1);
+
+  masker.grantConsent(token);
+
+  const followUp = masker.maskText('Email lucalogix12@gmail.com or call 415-555-0199');
+  assert.equal(followUp.includes('lucalogix12@gmail.com'), true); // shared → clear
+  assert.match(followUp, /\[PHONE_[^\]]+\]/); // everything else still masks
+  assert.equal(followUp.includes('415-555-0199'), false);
+  assert.equal(masker.takeMaskedCount(), 1); // consented pass is not counted
+  assert.equal(masker.tokenFor('lucalogix12@gmail.com'), token); // reverse lookup
+
+  // Consent for an unknown token is ignored (no throw, no stray pass-through).
+  masker.grantConsent('[EMAIL_9_unknown-token]');
+  assert.equal(masker.maskText('Email lucalogix12@gmail.com again').includes('[EMAIL_'), false);
+});
+
+// End-to-end through the shipped bundle (consent flow parked for v2): PII
+// goes out tokenized with NO notice, and reply frames restore tokens with
+// NO reveal strip — the page receives the full restored prose, append-only,
+// and no consent request is posted.
+test('XHR restores RPC frames without the parked reveal strip', () => {
+  const listeners = new Map();
+  const messages = [];
+  class MockXHR {
+    constructor() {
+      this.headers = {};
+      this.responseType = '';
+      this.status = 200;
+      this.readyState = 2; // LOADING — the long-poll is still open
+      this._responseText = '';
+    }
+    open(method, url) {
+      this.method = method;
+      this.url = url;
+    }
+    setRequestHeader(name, value) {
+      this.headers[name.toLowerCase()] = value;
+    }
+    send(body) {
+      this.sentBody = body;
+      const params = new URLSearchParams(body);
+      const text = Buffer.from(params.get('req1___data__'), 'base64').toString('utf8');
+      this.mintedTokens = text.match(/\[(?:PERSON|PHONE|EMAIL)_[^\]]+\]/g) || [];
+      this._responseText = '';
+    }
+  }
+  Object.defineProperty(MockXHR.prototype, 'responseText', {
+    configurable: true,
+    get() { return this._responseText; }
+  });
+  Object.defineProperty(MockXHR.prototype, 'response', {
+    configurable: true,
+    get() { return this._responseText; }
+  });
+
+  const pageWindow = {
+    location: {
+      href: 'https://gemini.google.com/app',
+      origin: 'https://gemini.google.com',
+      hostname: 'gemini.google.com'
+    },
+    XMLHttpRequest: MockXHR,
+    URL,
+    URLSearchParams,
+    Headers,
+    Request,
+    Response,
+    TransformStream,
+    console: { info() {}, warn() {} },
+    addEventListener: (type, listener) => listeners.set(type, listener),
+    postMessage: (message) => messages.push(message),
+    fetch: async () => new Response('ok')
+  };
+  const source = fs.readFileSync(require.resolve('../intercept.bundle.js'), 'utf8');
+  vm.runInNewContext(source, {
+    require,
+    window: pageWindow,
+    URL,
+    URLSearchParams,
+    Headers,
+    Request,
+    Response,
+    TransformStream,
+    TextEncoder,
+    TextDecoder,
+    atob: (value) => Buffer.from(value, 'base64').toString('binary'),
+    btoa: (value) => Buffer.from(value, 'binary').toString('base64')
+  });
+  listeners.get('message')({
+    source: pageWindow,
+    origin: pageWindow.location.origin,
+    data: { type: 'CLOAK_CONFIG', enabled: true, settings: {} }
+  });
+
+  // Turn 1: PII goes out tokenized; the parked notice does NOT ride along.
+  const prompt = 'my name is bob and my phone number is 919-123-4567';
+  const xhr = new pageWindow.XMLHttpRequest();
+  xhr.open('POST', 'https://geminiweb-pa.clients6.google.com/v1/processSession');
+  xhr.send(new URLSearchParams({
+    count: '2',
+    ofs: '0',
+    req0___data__: Buffer.from(buildSessionPart()).toString('base64'),
+    req1___data__: Buffer.from(buildUserPart(prompt)).toString('base64')
+  }).toString());
+
+  const personToken = xhr.mintedTokens.find((token) => token.startsWith('[PERSON')) || '';
+  assert.ok(personToken, 'prompt must mint a person token');
+  const sentText = Buffer.from(new URLSearchParams(xhr.sentBody).get('req1___data__'), 'base64').toString('utf8');
+  assert.equal(sentText.includes('[Cloak privacy notice]'), false);
+
+  // The reply prose carries the token; restoration swaps it for the value
+  // and delivers the FULL text (no strip, no scanner hold). The "S" first
+  // byte makes the decoded text fail strict protobuf parsing (group
+  // wire-type), so it takes the prose path deterministically.
+  const replyProto = encStringField(1, `Sure — done with ${personToken}. Anything else?`);
+  const replyJson = JSON.stringify([[0, ['c', Buffer.from(replyProto).toString('base64'), '', 8, 15, 30000]]]);
+  const frame = `${Buffer.byteLength(replyJson, 'utf8')}\n${replyJson}`;
+
+  const reads = [];
+  const read = () => {
+    const text = xhr.responseText;
+    reads.push(text);
+    return text;
+  };
+
+  // Progress 1: half a frame arrives — held (incomplete), nothing fires.
+  xhr._responseText = frame.slice(0, Math.floor(frame.length / 2));
+  assert.equal(read(), '');
+
+  // Progress 2: the frame completes — restored, length prefix corrected.
+  xhr._responseText = frame;
+  const delivered = read();
+  const newline = delivered.indexOf('\n');
+  const deliveredJson = delivered.slice(newline + 1);
+  assert.equal(Number(delivered.slice(0, newline)), Buffer.byteLength(deliveredJson, 'utf8'), 'length prefix must match the re-encoded frame');
+  const deliveredText = Buffer.from(JSON.parse(deliveredJson)[0][1][1], 'base64').toString('utf8');
+  // The page receives the FULL restored prose — the token is swapped for
+  // its value and nothing is held back or stripped.
+  assert.equal(deliveredText.includes(personToken), false);
+  assert.match(deliveredText, /Sure — done with bob\. Anything else\?/);
+
+  // v2-parked: no consent request is posted from the response path.
+  const reveal = messages.find(({ type }) => type === 'CLOAK_REVEAL_REQUEST');
+  assert.equal(reveal, undefined, 'no reveal request while the consent flow is parked');
+
+  // Append-only: every read is a prefix of the next (nothing already
+  // delivered is ever retracted or rewritten).
+  for (let i = 1; i < reads.length; i += 1) {
+    assert.equal(reads[i].startsWith(reads[i - 1]), true, `read ${i} changed already-delivered text`);
+  }
 });

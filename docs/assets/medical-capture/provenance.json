@@ -1,0 +1,27 @@
+{
+  "capturedDate": "2026-10-25",
+  "source": "Real Chrome screenshots from a live, signed-out ChatGPT conversation with Cloak protection on.",
+  "data": "Entirely fictional patient identifiers and medical history.",
+  "edits": "None. Files are original capture bytes. The fourth website stage focuses the left pane of 03-response.png using CSS; it is not a separate capture.",
+  "observed": {
+    "outgoing": [
+      "[PERSON_1_mfqaz1]",
+      "[ADDRESS_2_o1hnto]",
+      "[EMAIL_3_62jfoy]",
+      "[PHONE_4_x6zkzq]"
+    ],
+    "incoming": [
+      "[PERSON_1_mfqaz1]",
+      "[EMAIL_3_62jfoy]"
+    ],
+    "restored": [
+      "Alex Morgan",
+      "alex@example.com"
+    ]
+  },
+  "files": {
+    "01-original.png": "155e46dcf46159b1394a92a4ddd5846d1d13daa55f2b475c98be96411f2fbf96",
+    "02-payload.png": "6a018ac6e8fcd2a4eafe08d65b155f97142128875ef4c304014e8b7f68315b73",
+    "03-response.png": "9a30e20f727005648c310a2b86635d2db8d7c37884e9d469eee44c181502057b"
+  }
+}

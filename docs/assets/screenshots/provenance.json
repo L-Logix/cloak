@@ -1,0 +1,25 @@
+{
+  "description": "Actual popup HTML, CSS and controller rendered in an isolated screenshot harness. In-memory Chrome API fixture; no extension state accessed or modified.",
+  "theme": "dark",
+  "dimensions": {
+    "width": 380,
+    "height": 560,
+    "scale": 2
+  },
+  "sampleActivity": {
+    "valuesMasked": 4,
+    "requestsChecked": 1
+  },
+  "sampleSite": "https://chatgpt.com/",
+  "sourceHashes": {
+    "popup.html": "acc336ab5d9c01c63ae25239e2eb5d36bdb71f169640d73e4c0d91ad6366164e",
+    "styles.css": "d66447c891e575ab278483d1be9ad6a23e84e141b4f4b2fbdb8e3f48fd76c7d1",
+    "popup.js": "64917e55da1ae9b68c82af9a296232bb1a8c5410c86d262bd764be210e027760"
+  },
+  "screens": [
+    "home",
+    "try",
+    "vault",
+    "coverage"
+  ]
+}
