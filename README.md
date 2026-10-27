@@ -75,16 +75,11 @@ Actual popup interface with fictional activity and vault entries. [Screenshot de
 
 **Intercept → tokenize → restore.** The difficult part is preserving the conversation across both browser execution contexts and streaming response boundaries.
 
-```mermaid
-flowchart LR
-    A[Original prompt] --> B[Local detection]
-    B --> C[Masked request]
-    C --> D[ChatGPT]
-    D --> E[Stream buffer]
-    E --> F[Restored reply]
-    B -. Token mappings .-> V[(Local vault)]
-    V -. Original values .-> E
-```
+**Outgoing:** Your prompt → local detection → masked request → ChatGPT
+
+**Incoming:** ChatGPT reply → stream buffer → restored text
+
+The local vault stores token mappings so Cloak can restore the original values as the reply arrives.
 
 | Challenge | Implementation |
 | :--- | :--- |
