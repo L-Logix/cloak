@@ -1,171 +1,158 @@
 ![Cloak — Your ideas. Not your identity. Local privacy for ChatGPT.](docs/assets/readme-banner.svg)
 
-**A browser-native privacy layer for your AI conversations.**
+**Privacy at the network layer. Readability in the conversation.**
 
-Mask detected personal details before a ChatGPT request leaves your browser. Restore returned tokens locally, so the reply stays readable.
+Cloak is a Chrome extension that masks detected personal details before a ChatGPT request leaves your browser, then restores returned tokens locally. Write naturally. Send placeholders. Read a familiar reply.
 
-[![Install Cloak](docs/assets/readme/install.svg)](#quick-start) [![Explore interface](docs/assets/readme/interface.svg)](#the-cloak-experience) [![View evidence](docs/assets/readme/evidence.svg)](#see-it-in-chatgpt) [![Developer guide](docs/assets/readme/developer.svg)](#development)
+[![Install Cloak](docs/assets/readme/install.svg)](#quick-start) [![See the demo](docs/assets/readme/evidence.svg)](#see-it-in-chatgpt) [![Developer guide](docs/assets/readme/developer.svg)](#development)
 
 **Chrome 111+** · **Manifest V3** · **ChatGPT** · **GPL-3.0**
 
----
+## Why Cloak exists
 
-## Privacy belongs in the workflow
+The project starts with a question from North Carolina’s Research Triangle: **why should using AI mean handing over personal details?** Useful prompts can contain a name, an email, a phone number, an address, or a private project name. Cloak separates detected identifiers from the task and keeps their mappings in the browser.
 
-Useful prompts often contain details that do not need to leave your device: a name, an email address, a phone number, a street address, or a private project name. Cloak replaces detected values with reversible tokens inside supported outgoing requests, then restores those tokens when they return in the response.
+**No Cloak account. No Cloak server. No telemetry.** The AI provider receives the masked request; Cloak restores recognized tokens as the response returns.
 
-**No Cloak account. No Cloak server. No telemetry.** Detection and token mappings stay in your browser; ChatGPT receives the masked request.
+Built by an eighth-grade student in **North Carolina’s 4th Congressional District** for the **2026 Congressional App Challenge**, represented by **Rep. Valerie Foushee**.
 
-## Quick start
+## See how it works
 
-**Requirements:** Google Chrome 111 or later and access to ChatGPT.
+See Cloak in a real ChatGPT conversation, review the test results, or try the interactive demos on the website.
 
-[![Download extension](docs/assets/readme/download.svg)](docs/downloads/cloak-extension.zip)
+| Test | Result | What was tested |
+| :--- | :--- | :--- |
+| Repository suite | **49 / 49 passed** | [October 24, 2026 report](docs/assets/test-report.json); unit tests and simulated provider integrations. |
+| Synthetic exercise | **1,024 exact round trips · 4,096 identifiers masked** | [Saved results](docs/assets/synthetic-benchmark.json); generated prompts, not real-world accuracy. |
+| Live ChatGPT session | **One conversation · four stages** | Original input, outgoing tokens, raw response, and restored UI below. |
 
-1. Download the extension ZIP above and extract it.
-2. Open `chrome://extensions` and enable **Developer mode**.
-3. Select **Load unpacked**, then choose the extracted `cloak` folder containing `manifest.json`.
-4. Refresh ChatGPT. Open Cloak, confirm protection is on, and choose your coverage.
-
-Start with fictional details in **Try** to inspect masking and restoration before using the extension in a conversation. The download includes the ready-to-load bundle and its source code; a build is not required for installation.
-
-## The Cloak experience
-
-| Control | What you can do |
-| :--- | :--- |
-| **Protection** | Check the current site’s support status and turn protection on or off. |
-| **Try** | Preview how a prompt is masked and restored. |
-| **Coverage** | Choose detection for names, email addresses, phone numbers, and street addresses. |
-| **Custom terms** | Add exact terms such as private project names or internal references. |
-| **Vault** | Search token mappings, reveal individual values, export entries, or clear them. |
-| **Activity** | Review the extension’s local activity counters. |
-
-![Compact previews of Cloak Home, Try, and Vault](docs/assets/readme/interface.png)
-
-Actual popup UI rendered with fictional activity and vault data. [Screenshot provenance](docs/assets/screenshots/provenance.json).
+On the website, edit a sample prompt to see which details Cloak masks and restores. You can also split a sample reply into chunks of 1 to 16 bytes to explore how streaming restoration works. Both demos use Cloak’s actual functions in a separate preview build.
 
 ## See it in ChatGPT
 
-A fictional patient-history prompt demonstrates the complete path: readable input, masked network payload, returned tokens, and a restored conversation. The captures below come from **one real Chrome session on October 25, 2026**.
+A fictional patient-history prompt makes the mechanism visible. These captures come from **one real Chrome session on October 25, 2026**.
 
 [![Open real ChatGPT capture](docs/assets/readme/capture.svg)](docs/assets/medical-capture/02-payload.png)
 
-| Stage | Inspect the capture |
+| Stage | What to inspect |
 | :--- | :--- |
-| **01 · Before sending** | [The original prompt](docs/assets/medical-capture/01-original.png) contains a fictional name, email, phone, address, and medical history. |
-| **02 · Outgoing request** | [DevTools payload](docs/assets/medical-capture/02-payload.png) shows PERSON, EMAIL, PHONE, and ADDRESS tokens. |
-| **03 · Incoming response** | [Raw response](docs/assets/medical-capture/03-response.png) contains the name and email tokens. |
-| **04 · Restored conversation** | The left pane of [the same response capture](docs/assets/medical-capture/03-response.png) displays the original name and email again. |
+| **01 · Before sending** | [Original prompt](docs/assets/medical-capture/01-original.png): fictional identifiers alongside the medical-history task. |
+| **02 · Outgoing request** | [DevTools payload](docs/assets/medical-capture/02-payload.png): PERSON, EMAIL, PHONE, and ADDRESS tokens replace the detected values. |
+| **03 · Incoming response** | [Raw response](docs/assets/medical-capture/03-response.png): the name and email return as tokens. |
+| **04 · Restored conversation** | The left pane of [that same capture](docs/assets/medical-capture/03-response.png): the name and email are readable again. |
 
-Three unaltered screenshots document four stages. [Capture provenance](docs/assets/medical-capture/provenance.json) records their hashes. Medical context remains in the outgoing request: this demonstrates identifier masking, not clinical guidance or HIPAA-compliant de-identification.
+Three unaltered screenshots document four stages. [Capture details and file hashes](docs/assets/medical-capture/provenance.json). Medical context remains in the request; this is an identifier-masking demonstration, not clinical validation or HIPAA-compliant de-identification.
 
-## Platform Compatibility & Current Status
+## Quick start
 
-**ChatGPT is the only supported platform in this release.**
+**Requires Google Chrome 111+ and access to ChatGPT.** No build is needed to install the packaged extension.
 
-| Platform | Status | Current implementation |
-| :--- | :--- | :--- |
-| **ChatGPT** | **Stable · supported** | Outgoing interception and incoming stream restoration, demonstrated in the live captures above. |
-| **Google Gemini** | **Beta · experimental** | Outgoing protobuf interception is implemented. Incoming restoration has reported buffering pauses; a restoration patch is planned. |
-| **Claude** | **Alpha · experimental** | Currently unsupported. WSS/WebSocket interception is planned for V2. |
+[![Download extension](docs/assets/readme/download.svg)](docs/downloads/cloak-extension.zip)
 
-Experimental integrations remain in the source and host permissions. Provider changes can affect compatibility; this table describes the current release scope.
+1. Download the ZIP and extract it.
+2. Open `chrome://extensions` and enable **Developer mode**.
+3. Select **Load unpacked** and choose the extracted `cloak` folder containing `manifest.json`.
+4. Refresh ChatGPT. Open Cloak, confirm protection is on, and choose your coverage.
 
-## Architecture
+Use fictional details in **Try** to inspect masking and restoration first. The download includes the ready-to-load bundle, source, tests, and license.
 
-Cloak operates between the page’s network requests and the AI provider. Its stream buffer retains incomplete token fragments so a token split across response chunks can be restored when complete.
+## The Cloak experience
+
+![Compact previews of Cloak Home, Try, and Vault](docs/assets/readme/interface.png)
+
+Actual popup interface with fictional activity and vault entries. [Screenshot details](docs/assets/screenshots/provenance.json).
+
+| Control | Purpose |
+| :--- | :--- |
+| **Protection** | Check site support and switch protection on or off. |
+| **Try** | Preview a prompt’s masked and restored text. |
+| **Coverage** | Choose names, emails, phone numbers, and street addresses. |
+| **Custom terms** | Add exact private terms, such as a project name. |
+| **Vault** | Search mappings, reveal individual values, export entries, or clear them. |
+| **Activity** | Review local activity counters. |
+
+## The engineering
+
+**Intercept → tokenize → restore.** The difficult part is preserving the conversation across both browser execution contexts and streaming response boundaries.
 
 ```mermaid
 flowchart LR
-    A[Original prompt] --> B[Local detection and tokenization]
+    A[Original prompt] --> B[Local detection]
     B --> C[Masked request]
     C --> D[ChatGPT]
-    D --> E[Stream buffer and local restoration]
-    E --> F[Readable reply]
-    B -. Local token mappings .-> V[(Browser vault)]
-    V -. Restore values .-> E
+    D --> E[Stream buffer]
+    E --> F[Restored reply]
+    B -. Token mappings .-> V[(Local vault)]
+    V -. Original values .-> E
 ```
 
-| Layer | Implementation |
+| Challenge | Implementation |
 | :--- | :--- |
-| **Request and response engine** | [`intercept.js`](intercept.js) wraps fetch and XMLHttpRequest for allowlisted chat requests; uses Compromise NLP, address parsing, regular expressions, and custom terms. |
-| **Extension bridge** | [`content.js`](content.js) connects the page context to extension storage and provides composer indicators. |
-| **Product interface** | [`popup.html`](popup.html), [`popup.js`](popup.js), and [`styles.css`](styles.css) implement the controls and vault. |
-| **Interactive showcase** | [`docs/`](docs/README.md) contains the static website, real captures, and a separate preview build of the masking and streaming functions. |
+| **Intercept page requests under Manifest V3** | [`intercept.js`](intercept.js) runs in the page’s main world and wraps fetch/XHR for allowlisted chat requests. [`content.js`](content.js) bridges that context to extension storage through postMessage. |
+| **Mask text inside structured payloads** | The `rewriteBody` pipeline locates text, applies Compromise NLP, address parsing, regular expressions and custom terms, then rebuilds the request. |
+| **Restore tokens split across chunks** | `restoreStream` buffers trailing token fragments until the token can be resolved and restored. Try this on the website by changing the size of incoming chunks. |
+| **Make privacy controls usable** | [`popup.js`](popup.js), [`popup.html`](popup.html), and [`styles.css`](styles.css) provide coverage settings, a searchable vault, and local activity. |
 
-## Verification
+## Platform Compatibility & Current Status
 
-| Evidence | Recorded result | Scope |
+**ChatGPT is the only supported platform in this release.** The matrix below defines current support.
+
+| Platform | Status | Current implementation |
 | :--- | :--- | :--- |
-| [Repository test suite](docs/assets/test-report.json) | **49 / 49 passed** · October 24, 2026 | Unit tests and simulated provider integrations. |
-| [Synthetic masking exercise](docs/assets/synthetic-benchmark.json) | **1,024 exact round trips · 4,096 identifiers masked** | Generated prompts; restored text matched the original character for character. |
-| [Live ChatGPT captures](docs/assets/medical-capture/) | **One conversation, four stages** | Direct observation of outgoing masking and incoming restoration. |
-| [Website workbench](docs/index.html) | **Six executable checks + adjustable stream chunks** | Actual functions running locally in a separate preview build. |
+| **ChatGPT** | **Stable · supported** | Outgoing interception and incoming stream restoration, demonstrated in the live captures. |
+| **Google Gemini** | **Beta · experimental** | Outgoing protobuf interception is implemented. Incoming restoration has reported buffering pauses; a restoration patch is planned. |
+| **Claude** | **Alpha · experimental** | Currently unsupported. WSS/WebSocket interception is planned for V2. |
 
-The synthetic exercise varies email addresses, phone numbers, and street numbers across four task phrases with one fictional name. Its results are not a real-world detection-accuracy estimate, user count, or clinical validation.
+Experimental integrations remain in the source and host permissions. Provider changes can affect compatibility.
 
 ## Privacy & data handling
 
-| Area | Behavior |
-| :--- | :--- |
-| **Processing** | Detection and restoration run locally. Cloak has no backend or telemetry. |
-| **Storage** | The vault uses `chrome.storage.local`. Values are concealed in the interface until revealed; storage is not encrypted by Cloak. |
-| **External data** | The AI provider receives the masked request and applies its own data policies. Undetected details and context can remain. |
-| **Coverage limits** | Pattern detection can miss details. Tokens are reversible placeholders, not encryption or certified de-identification. |
-| **Media requests** | Detected image/video generation requests bypass masking and trigger a notice. |
-| **Institutional use** | Organization policies, approvals, and legal obligations still apply. Cloak does not override AI restrictions or establish HIPAA compliance. |
+- **Local processing:** detection, restoration and token mappings stay in the browser. Cloak has no backend or telemetry.
+- **Local storage:** the vault uses `chrome.storage.local`. Values are concealed in the interface until revealed; Cloak does not encrypt that storage.
+- **Defined coverage:** undetected details and context can remain in the request. Reversible tokens are placeholders, not encryption or certified de-identification.
+- **Media behavior:** detected image/video generation requests bypass masking and trigger a notice.
+- **Institutional use:** organization policies, approvals and legal obligations still apply. Cloak does not override AI restrictions or establish HIPAA compliance.
 
-Review sensitive prompts before sending. For healthcare workflows, consult your organization’s privacy and security process and [HHS de-identification guidance](https://www.hhs.gov/hipaa/for-professionals/special-topics/de-identification/index.html).
+Review sensitive prompts before sending. The synthetic exercise varies emails, phones and street numbers across four task phrases with one fictional name; its results are not a clinical or real-world accuracy evaluation.
+
+## Built in North Carolina
+
+The saved source register documents **57 North Carolina organizations with published AI privacy limits and guidance** across education, government, business and healthcare. Its separate population subtotal covers **267,382 fall-2025 enrollments at 14 cited universities**.
+
+If every student represented by that subtotal used ChatGPT with Cloak, the saved study assumptions model **97,274 sensitive messages per day—about 35.5 million per year**. This estimates potential exposure, not measured PII saved or actual adoption. [Inspect the sources, calculation and assumptions](docs/impact-methodology.md).
+
+## Roadmap
+
+- Expand detection evaluation beyond the current synthetic fixtures.
+- Improve Gemini restoration and investigate Claude transport support.
+- Explore user-approved sharing of a specific detail only when a task needs it.
 
 ## Development
-
-Install dependencies and build the browser bundle:
 
 ```sh
 npm ci
 npm run build:interceptor
 ```
 
-Run the repository tests without rebuilding:
+Run the existing tests without rebuilding:
 
 ```sh
 node --test tests/intercept.test.js tests/content.test.js
 ```
 
-`npm test` also runs the interceptor build through its `pretest` script. Reload the unpacked extension and refresh ChatGPT after runtime changes.
+`npm test` also rebuilds through `pretest`. Reload the unpacked extension and refresh ChatGPT after runtime changes.
 
-Preview and verify the website:
+The GitHub Pages site uses plain HTML, CSS and JavaScript. Its demos run without AI requests or access to the installed extension’s storage.
 
 ```sh
 node docs/serve.cjs
 # Open http://127.0.0.1:4173
 ```
 
-In another terminal:
-
-```sh
-node docs/verify.cjs
-node docs/benchmark.cjs
-```
-
-The website uses plain HTML, CSS, and JavaScript. Its demos run without AI requests or access to the installed extension’s storage. See the [website guide](docs/README.md) for GitHub Pages deployment and download packaging, and the [test guide](tests/README.md) for test details.
-
-## Built in North Carolina
-
-Created by an eighth-grade student in **North Carolina’s 4th Congressional District** for the **2026 Congressional App Challenge**, represented by **Rep. Valerie Foushee**. Cloak explores a practical question for the Research Triangle: how can people use AI while keeping personal details under their control?
-
-The project’s source register documents **49 North Carolina organizations with published AI privacy limits and guidance**, spanning higher education, K–12 schools, government, business, and healthcare. Each entry identifies the scope of the rule, including conditional approvals and nonbinding recommendations. A separate population subtotal covers **267,382 fall-2025 enrollments at 14 cited universities**. These are documented examples and community-size figures, not a statewide ban count or measured product adoption. If every student in that subtotal used ChatGPT with Cloak, combining published usage and sensitive-data rates models **97,274 sensitive messages per day (about 35.5 million per year)**. This describes potential exposure, not measured PII saved; the linked methodology distinguishes sensitive data from PII and states every assumption. [Read every source, the enrollment calculation, and the full-use exposure scenario](docs/impact-methodology.md).
-
-## Roadmap
-
-- **Broader evaluation:** expand detection testing beyond the current synthetic fixtures.
-- **Provider compatibility:** improve Gemini restoration and investigate Claude transport support.
-- **Permission-based sharing:** explore letting users approve a specific detail only when a task needs it.
-
-These are planned directions. The compatibility matrix above defines what is supported today.
+In another terminal, run `node docs/verify.cjs`. Use `node docs/benchmark.cjs` to reproduce the synthetic exercise. See the [website guide](docs/README.md) for publishing and packaging, and the [test guide](tests/README.md) for test details.
 
 ---
 
 Licensed under [GPL-3.0](LICENSE). Built with [Compromise](https://github.com/spencermountain/compromise), [addressit](https://github.com/DamonOehlman/addressit), and [esbuild](https://github.com/evanw/esbuild).
 
-Cloak is an independent student-built project. This repository is not an official congressional website.
+Independent student-built project. Not an official congressional website.

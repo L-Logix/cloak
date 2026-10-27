@@ -1,6 +1,6 @@
 {
   "archive": "cloak-extension.zip",
-  "sha256": "093a4b0000e7f49027f5335398684556cf138c6c93f31064c048444ebdd6c7ac",
+  "sha256": "35e22721be6b4027e36ff19e2b88e16a5e792890a77826c72811b17c5fdd1970",
   "files": {
     "manifest.json": "d7b2d1bdc270a14fc625299ef959668eb07932fbef12665825d887dc46d6a0b8",
     "popup.html": "73927d8ab106f9a517109dc00d05c2c566b03181ae417767177bf7205a53b02e",
@@ -13,7 +13,7 @@
     "package.json": "603ee1f05a6bef8c88449fbe49b738e46761907697f7624884df5449ffa9dfd6",
     "package-lock.json": "a85987cde3ca7ef43d37a5f7682dfcc9595c7b15711244921b88d6f31fa41ecb",
     "LICENSE": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809",
-    "README.md": "bb6806a5ec104f598678cd4d7c555658d78caeb358d2ff21f4c72cb103ccdc9d",
+    "README.md": "7e6d6d05275b8dc9530d080e9cf03ffdb690f2cfdf6c3fecf0eda66e634d36f5",
     "tests/intercept.test.js": "dc76b3b12ff00fcc864335b168f19ea170a419f001602f6dcfb81d4bc46d474c",
     "tests/content.test.js": "1cda0c40f0ddc18507a99f5af8d341aa622e4e1b8e0bbf9751a2dcca5623c741",
     "tests/README.md": "0316884124b1fd954b7a43edc8076a608397d5631e33785af0bcb7c0a0696203"

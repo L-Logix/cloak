@@ -15,7 +15,7 @@ All asset paths are relative and work under the `/cloak/` project prefix. No bui
 
 The opening screen uses the actual Home screenshot. The page features real ChatGPT/DevTools captures and an expandable fictional patient-history demo; the real engine masks its name, address, email, and phone. Visitors can switch between masked text, exact restoration, and the memory-only demo vault. Advanced masking controls and the engineering workbench are expandable to keep the page uncluttered.
 
-The three counters show 49 documented NC organizations with AI privacy limits and guidance, 267,382 fall 2025 student enrollments across 14 cited universities, and 97,274 modeled sensitive messages per day if every student in the enrollment subtotal used ChatGPT with Cloak (approximately 35.5 million/year). This combines 4.28 daily prompts per weekly active user from Epoch AI with Harmonic’s 8.5% sensitive-prompt rate; it is an exposure scenario, not measured PII prevention. Recalculate them from the sourced register with `node docs/update-impact.cjs`. The count is not a statewide census, enrollment is not a count of people blocked by bans, and modeled exposure is not measured prevention or a legal-compliance claim. Each counter opens the sources and methodology disclosure. The original synthetic results remain in `assets/synthetic-benchmark.json` and the root README. Section fades and number animation respect reduced-motion preferences; static content remains available without JavaScript. The healthcare example demonstrates identifier masking and does not claim HIPAA compliance or complete PHI de-identification; a linked FAQ cites HHS guidance. The video and extension backend remain unchanged. Only popup presentation and release-status labels were edited.
+The three counters show 57 documented NC organizations with AI privacy limits and guidance, 267,382 fall 2025 student enrollments across 14 cited universities, and 97,274 modeled sensitive messages per day if every student in the enrollment subtotal used ChatGPT with Cloak (approximately 35.5 million/year). This combines 4.28 daily prompts per weekly active user from Epoch AI with Harmonic’s 8.5% sensitive-prompt rate; it is an exposure scenario, not measured PII prevention. Recalculate them from the sourced register with `node docs/update-impact.cjs`. The count is not a statewide census, enrollment is not a count of people blocked by bans, and modeled exposure is not measured prevention or a legal-compliance claim. Each counter opens the sources and methodology disclosure. The original synthetic results remain in `assets/synthetic-benchmark.json` and the root README. Section fades and number animation respect reduced-motion preferences; static content remains available without JavaScript. The healthcare example demonstrates identifier masking and does not claim HIPAA compliance or complete PHI de-identification; a linked FAQ cites HHS guidance. The video and extension backend remain unchanged. Only popup presentation and release-status labels were edited.
 
 `downloads/cloak-extension.zip` contains the current extension, source, license, and JavaScript tests. Every archived file was compared byte-for-byte with the repository. `downloads/manifest.json` records the archive and file hashes. Refresh it after future extension changes with `node docs/package-download.cjs`; set `CLOAK_PYTHON` to a Python 3 executable if `python` is not on PATH. Extract the ZIP and load its `cloak` folder in Chrome. The website makes no ranking or award guarantees.
 
@@ -52,30 +52,26 @@ The site now emphasizes the three national criteria in the [2026 rules, section 
 
 - **Idea:** concrete everyday uses and request-level tokenization with local restoration.
 - **Implementation and design:** editable real-engine demo, coverage controls, and a keyboard-accessible screenshot gallery.
-- **Programming skill:** the real `restoreStream` function operating on adjustable chunk sizes, six executable browser checks, and a source-code map.
+- **Programming skill:** the real `restoreStream` function operating on adjustable chunk sizes, design decisions, and a source-code map.
 
 These are evidence for judging, not additional official scoring categories or a prediction of placement. No separate NC-04 weighting was verified. The submission video and answers remain part of the official review.
 
-The engineering preview also exports the original `restoreStream`, `isTargetRequest`, and `containsMediaIntent` functions. It still installs no request hooks. Stream inputs are explicitly synthetic. The six checks test fixed examples and report their actual runtime outcome.
+The engineering preview also exports the original `restoreStream`, `isTargetRequest`, and `containsMediaIntent` functions. It still installs no request hooks. Stream inputs are explicitly synthetic.
 
 The existing repository suite passed 49/49 tests on October 24, 2026, using `node --test tests/intercept.test.js tests/content.test.js` without rebuilding or modifying the extension. `assets/test-report.json` records the command, scope, and source hashes.
 
 The four screenshots in `assets/screenshots/` were rendered from the existing `popup.html`, `styles.css`, and `popup.js` with an isolated in-memory Chrome API fixture and the preview engine. They are actual interface renders with fictional data, not screenshots of the user's live extension state. Source hashes and fixture details are recorded in `assets/screenshots/provenance.json`. Captions identify sample data. Original extension files were not changed.
 
-## Video-aligned copy
+## Copy provenance
 
-Website copy follows the narration of `full_cac_draft_1.mp4`, transcribed locally from the user's Downloads folder. The source video and transcript are not included in the website. The main narrative is:
-
-- 0:00–0:42: privacy and AI progress, Research Triangle context, eighth-grade creator in NC-04.
-- 0:42–1:18: inspect outgoing tokens, then demonstrate local restoration.
-- 1:18–2:10: Manifest V3 execution contexts, fetch/XHR interception, postMessage, payload parsing, and local detection.
-- 2:10–2:38: streaming token fragments and the restoration buffer.
-- 2:38–2:57: future permission-based sharing and the project's forward direction.
-
-Technical copy is also checked against the implementation. The page conveys the video's motivation without repeating unsupported numerical, institutional-policy, compliance, or absolute-security claims. Future permission-based sharing is explicitly identified as planned functionality. The video’s uncertain automated transcription of the creator’s surname is not used.
+Copy was checked against the creator’s saved `Cloak CAC Final.mp4` and project files. The recording is not bundled with or linked from this website. Technical claims are checked against the implementation; future permission-based sharing is explicitly identified as planned functionality.
 
 ## Real ChatGPT capture sequence
 
 The three unaltered PNGs in assets/medical-capture were captured from one real Chrome conversation with Cloak enabled. Four website tabs show the original prompt, outgoing request, raw response, and restored UI. The last stage uses a CSS viewport onto the left pane of the response screenshot; it is explicitly identified as the same capture. No generated screenshot is presented as evidence. The patient data is fictional.
 
 Run `node docs/benchmark.cjs` to reproduce the numbered synthetic exercise. Its generated report explains its limited scope. Platform status distinguishes ChatGPT support from experimental Gemini and Claude code paths.
+
+## Presentation refresh
+
+The original recording, screenshots, saved source register, saved test reports, and repository code informed this pass. No new external research was added. The hero links directly to the real ChatGPT captures and installation. The engineering section keeps saved test results inside optional technical details. The pass/fail checklist has been removed; the editable masking and stream demos remain. The README follows the same problem → proof → implementation sequence. `presentation.css` styles the actions and evidence ledger within the black/green responsive layout.

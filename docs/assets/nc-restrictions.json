@@ -421,12 +421,79 @@
       "source": "https://user-kcmpnye.cld.bz/Best-Practices-and-Guidelines-for-ChatGPT-and-Similar-AI-Mod/2/",
       "restriction": "City IT guidance prohibits uploading confidential information, PII, login credentials and city operational documents to AI chatbots; it also prohibits using chatbots to find private information about employees or residents.",
       "enrollmentFall2025": null
+    },
+    {
+      "id": "cabarrusschools",
+      "name": "Cabarrus County Schools",
+      "sector": "K–12 education",
+      "source": "https://www.cabarrus.k12.nc.us/105238_3",
+      "restriction": "District AI guidelines tell students not to enter personal information into AI platforms and prohibit violating privacy by entering personal or sensitive data. Approved tools and assignment-specific permission are also required.",
+      "enrollmentFall2025": null
+    },
+    {
+      "id": "camdenschools",
+      "name": "Camden County Schools",
+      "sector": "K–12 education",
+      "source": "https://files-backend.assets.thrillshare.com/documents/asset/uploaded_file/3653/Ccs/5555f982-23c4-4f73-8519-4f1bd26bdbb4/25-26_CCS_Student_Handbook___Code_of_Conduct_w.pdf?disposition=inline",
+      "restriction": "The 2025–26 handbook’s AI guidelines, printed page 69, advise avoiding sensitive data such as student IDs, grades, signatures and account credentials in AI tools. Users must review data practices and consult district technology staff when security is uncertain.",
+      "enrollmentFall2025": null
+    },
+    {
+      "id": "unioncounty",
+      "name": "Union County",
+      "sector": "Government",
+      "source": "https://centralina.org/wp-content/uploads/2024/02/Union-County-Generative-AI-Guidance-Document.pdf",
+      "restriction": "Employee guidance published through Centralina Regional Council bars employee information, software code and county proprietary data from ChatGPT and similar tools. A September 2025 county bulletin confirms updated guidance remains in use; this public copy predates that update.",
+      "enrollmentFall2025": null
+    },
+    {
+      "id": "granvilleschools",
+      "name": "Granville County Public Schools",
+      "sector": "K–12 education",
+      "source": "https://sites.google.com/gcs.k12.nc.us/gcps-ai-dashboard/faq",
+      "restriction": "The district’s AI FAQ says tools collecting unnecessary personal information are not allowed. AI tools undergo data-privacy, bias and educational-value review before approval, alongside district privacy requirements.",
+      "enrollmentFall2025": null
+    },
+    {
+      "id": "greensboroday",
+      "name": "Greensboro Day School",
+      "sector": "K–12 education",
+      "source": "https://www.greensboroday.org/academics/artificial-intelligence-at-gds/ai-safety-data-privacy",
+      "restriction": "School AI guidance permits only vetted services, requires data minimization and prohibits sharing PII under its responsible-use policy. It identifies a limited allowance for necessary student names in approved tools using school accounts.",
+      "enrollmentFall2025": null
+    },
+    {
+      "id": "durhamacademy",
+      "name": "Durham Academy",
+      "sector": "K–12 education",
+      "source": "https://www.da.org/about/newsroom/magazine/news-post-da/~board/news/post/da-unveils-generative-ai-framework-for-faculty-and-staff",
+      "restriction": "Its published faculty/staff AI framework marks sensitive-data handling and surveillance as high-risk “Red Light” uses to avoid. Counted as official risk guidance, not a blanket AI ban.",
+      "enrollmentFall2025": null
+    },
+    {
+      "id": "ncdpi",
+      "name": "North Carolina Department of Public Instruction",
+      "sector": "Government",
+      "source": "https://content.govdelivery.com/attachments/NCSBE/2024/01/16/file_attachments/2749425/NCDPI%20Generative%20AI%20Implementation%20Recommendations%20and%20Considerations%20for%20PK-13%20Public%20Schools.pdf",
+      "restriction": "Its January 2024 published school implementation guidance instructs users not to type, paste or upload PII into generative AI, including student IDs. Counted once as the issuing agency’s recommendations; no additional school districts are inferred from statewide reach.",
+      "enrollmentFall2025": null
+    },
+    {
+      "id": "sas",
+      "name": "SAS Institute",
+      "sector": "Business",
+      "source": "https://www.sas.com/en_us/trust-center/sas-trust-ai.html",
+      "restriction": "The Cary-headquartered company’s published employee GenAI policy summary requires privacy protection, safeguards for confidential information, and review of AI capabilities before onboarding. Counted as privacy and approval controls, not a prohibition on all AI use.",
+      "enrollmentFall2025": null
     }
   ],
   "additionalEvidence": {
     "truistNCLocation": "https://www.truist.com/who-we-are/about-truist",
     "labcorpNCLocation": "https://www.labcorp.com/about/corporate-facts",
-    "greensboroPublicationHost": "https://www.greensboro-nc.gov/home/showpublisheddocument/59951/638588069348170000"
+    "greensboroPublicationHost": "https://www.greensboro-nc.gov/home/showpublisheddocument/59951/638588069348170000",
+    "unionCountyUpdatedGuidance": "https://content.govdelivery.com/accounts/NCUNION/bulletins/3f29fed",
+    "granvilleDashboardIdentity": "https://sites.google.com/gcs.k12.nc.us/gcps-ai-dashboard/home",
+    "sasNCLocation": "https://www.sas.com/en_us/contact.html"
   },
   "excluded": "No count is assigned to unnamed organizations, academic-integrity-only bans, or historical media reports without sufficiently current qualifying evidence. Recommendations and limited-scope rules are identified explicitly. Inclusion does not imply Cloak can satisfy or remove a rule: approved-tool, clinical-device, and other requirements remain applicable. Listed organizations are not represented as Cloak customers, partners, endorsers, or adopters."
 }
