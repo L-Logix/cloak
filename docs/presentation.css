@@ -1,0 +1,13 @@
+/* Clear actions and inspectable evidence. */
+:root { scroll-padding-top: 24px; }
+.button.secondary { background: #102018; color: #c8ecd4; border: 1px solid #375b44; box-shadow: none; }
+.button.secondary:hover { background: #193324; border-color: #70c88c; }
+.hero-actions { gap: 12px; flex-wrap: wrap; }
+.hero-principle { color: #a0b9a8; font-size: 12px; margin-top: 20px; }
+button:focus-visible, a:focus-visible, summary:focus-visible { outline-color: #86efac; }
+@media(max-width:600px) {
+  .hero-actions .button { padding: 14px 16px; gap: 13px; }
+}
+
+.technical-results { margin: 26px 0 18px; max-width: 720px; color: #a0b9a8; font-size: 12px; line-height: 1.8; }
+.technical-results a { color: #baf5ce; text-decoration: underline; text-underline-offset: 3px; }

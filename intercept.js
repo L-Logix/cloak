@@ -39,7 +39,7 @@ const parseAddress = require('addressit');
   // Image/video requests need the full prompt (the model paints from context),
   // so those requests bypass masking entirely — see containsMediaIntent().
   const MEDIA_PATTERN = /\b(?:draw|generate|create|make)\s+(?:me\s+)?(?:an?\s+)?(?:image|picture|photo|illustration|video)\b|\bimage generation\b/i;
-
+  // BETA - Gemini's new processSession transport is a base64 protobuf form field, so we detect it and walk the protobuf instead of masking raw syntax. The pattern below is a cheap heuristic to avoid false positives: it looks for the form field names Gemini uses, and the count/offset fields that precede them. The actual protobuf is validated in parseProtobuf() and mapProtobufProse() below.
   // Gemini's processSession writes one form field per protobuf part:
   // count=2&ofs=0&req0___data__=<base64>&req1___data__=<base64>.
   const GEMINI_RPC_FORM_PATTERN = /^count=\d+&ofs=\d+&req\d+___data__=/;
@@ -67,7 +67,6 @@ Cloak will ask the user for consent and, if granted, will resend this conversati
   const REVEAL_MAGIC_PATTERN = /[*_`]*[ \t]*Requesting access to know (.+?) from Cloak[.!?,;]*[*_`]{0,3}[ \t]*/gi;
 
   // ---- Small helpers ------------------------------------------------------
-
   // Make a literal safe to embed in a RegExp (".", "(" etc. must stay literal).
   function escapeRegExp(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
