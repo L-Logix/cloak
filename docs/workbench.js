@@ -6,10 +6,13 @@
   const runStream = $('#run-stream');
   const runChecks = $('#run-checks');
   if (!engine?.restoreStream) {
-    $('#stream-status').textContent = 'Reload to load the engineering demo.';
-    runStream.disabled = runChecks.disabled = true;
+    const streamStatus = $('#stream-status');
+    if (streamStatus) streamStatus.textContent = 'Reload to load the engineering demo.';
+    if (runStream) runStream.disabled = true;
+    if (runChecks) runChecks.disabled = true;
     return;
   }
+  if (!chunkSize || !runStream) return;
   const make = settings => {
     const masker = engine.createMasker();
     masker.configure({ enabled: true, settings: settings || {} });
@@ -83,17 +86,18 @@
     ].every(([url, expected]) => engine.isTargetRequest(url) === expected)],
     ['Media intent recognized', () => engine.containsMediaIntent('Please draw a picture of a dog') && !engine.containsMediaIntent('What is in this picture?')]
   ];
-  const checkRows = checks.map(([name]) => {
+  const checkResults = $('#check-results');
+  const checkRows = checkResults ? checks.map(([name]) => {
     const row = document.createElement('li');
     const label = document.createElement('span');
     const state = document.createElement('b');
     label.textContent = name;
     state.textContent = 'READY';
     row.append(label, state);
-    $('#check-results').append(row);
+    checkResults.append(row);
     return { row, state };
-  });
-  runChecks.addEventListener('click', async () => {
+  }) : [];
+  if (runChecks) runChecks.addEventListener('click', async () => {
     runChecks.disabled = true;
     $('#checks-summary').textContent = 'Running six local checks…';
     let passed = 0;
