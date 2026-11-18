@@ -2,7 +2,7 @@
 
 [Back to the Cloak README](../README.md#built-in-north-carolina)
 
-Reviewed October 25, 2026. Five documented organizations publish privacy-based AI restrictions:
+Reviewed October 25, 2026. Five documented organizations that have privacy-based AI restrictions:
 
 - [NCDIT](https://it.nc.gov/programs/ai-policy/use-publicly-available-generative-ai): personal and confidential information must not be entered into public generative AI.
 - [NC State](https://ai.ncsu.edu/ai-tools/): sensitive-data use depends on approved tools and compliance review.
@@ -14,4 +14,4 @@ These are documented examples, not a statewide total or blanket AI bans. The def
 
 **Community size:** NC State (39,259) + N.C. A&T (15,275) + Duke (17,325) = **71,859 student enrollments**, using the [fall 2025 preliminary UNC System report](https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf) and [Duke’s fall 2025 figures](https://facts.duke.edu/). This partial population proxy excludes employees and the other organizations, may include cross-enrolled students, and does not count people blocked from AI.
 
-**Illustrative reach:** round(71,859 × 10%) = **7,186 potential users**. Ten percent is a planning assumption, not a measured adoption rate or forecast. It assumes suitable use cases and institutional permission. It does not estimate people who can bypass a restriction or achieve legal compliance. These organizations are not represented as customers, partners, or endorsers.
+**Illustrative reach:** round(71,859 × 10%) = **7,186 potential users**. Ten percent is a planning assumption, not a measured adoption rate or forecast. It assumes suitable use cases and institutional permission. It does not estimate people who can bypass a restriction or achieve legal compliance. These organizations are not represented as customers, partners, or endorsers. This is just an example.

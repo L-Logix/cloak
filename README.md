@@ -2,23 +2,23 @@
 
 **Privacy at the network layer. Readability in the conversation.**
 
-Cloak is a Chrome extension that masks detected personal details before a ChatGPT request leaves your browser, then restores returned tokens locally. Write naturally. Send placeholders. Read a familiar reply.
+Cloak is a Chrome extension that masks detected personal details *before* an AI prompt leaves your browser, then restores the original values locally in the response. Write naturally, send placeholders, and read a familiar reply.
 
 [![Install Cloak](docs/assets/readme/install.svg)](#quick-start) [![See the demo](docs/assets/readme/evidence.svg)](#see-it-in-chatgpt) [![Developer guide](docs/assets/readme/developer.svg)](#development)
 
-**Chrome 111+** · **Manifest V3** · **ChatGPT** · **GPL-3.0**
+**Chrome 111+** · **Manifest V3** · **ChatGPT** · **GPL-3.0-only**
 
 ## Why Cloak exists
 
-The project starts with a question about North Carolina’s Research Triangle: **why should using AI mean handing over private personal details?** Useful prompts can contain a name, an email, a phone number, or an address. Cloak separates detected identifiers from the task and keeps their mappings in the browser.
+The project starts with a question from North Carolina’s Research Triangle: **why should using AI mean handing over private personal details?** Useful prompts can contain a name, an email, a phone number, or an address. Cloak separates detected identifiers from the task and keeps their mappings in browser storage.
 
-**No account. No server. No telemetry.** The AI provider receives the masked request; Cloak restores recognized tokens as the response returns. None of your data is sent to a backend server - everything is local and on-device.
+**No account. No Cloak server. No telemetry.** The AI provider receives the masked request, and Cloak restores recognized tokens as the response returns. Detection and vault mappings stay local to the browser.
 
 Built by an eighth-grade student in **North Carolina’s 4th Congressional District** for the **2026 Congressional App Challenge**, represented by **Representative Valerie Foushee**.
 
-## See the Testing
+## Testing
 
-Look at how we tested Cloak and determined if it was production-ready. These are just a handful of the tests that were conducted.
+These reports summarize the repository suite, synthetic benchmark, and live ChatGPT capture.
 
 | Test | Result | What was tested |
 | :--- | :--- | :--- |
@@ -65,8 +65,8 @@ Actual popup interface with fictional activity and vault entries. [Screenshot de
 | Control | Purpose |
 | :--- | :--- |
 | **Protection** | Check supported sites and switch protection on or off. |
-| **Try** | Experience the cloaking and restoration of sensitive text in a message first-hand.|
-| **Coverage** | Customize your cloaked values between names, emails, phone numbers, and street addresses. |
+| **Try** | Preview cloaking and restoration in a fictional prompt. |
+| **Coverage** | Choose names, emails, phone numbers, and street addresses. |
 | **Custom terms** | Add exact private terms to be hidden, such as a project name. |
 | **Vault** | Search mappings, reveal individual values, export entries, or clear them. |
 | **Activity** | Review your Cloak stats and local activity counters. |
@@ -92,13 +92,13 @@ The local vault stores token mappings so Cloak can restore the original values a
 
 ## Platform Compatibility & Current Status
 
-**ChatGPT is the only supported platform in this release.** The matrix below defines current support.
+**ChatGPT is the only supported platform in this release.** The status matrix defines current compatibility.
 
 | Platform | Status | Current implementation |
 | :--- | :--- | :--- |
-| **ChatGPT** | **Stable · supported** | Outgoing interception and incoming stream restoration, demonstrated in the live captures. |
-| **Google Gemini** | **Beta · experimental** | Outgoing protobuf interception is implemented. Incoming restoration has reported buffering pauses; a restoration patch is planned. |
-| **Claude** | **Alpha · experimental** | Currently unsupported. WSS/WebSocket interception is planned for V2. |
+| **ChatGPT** | ![Supported](https://img.shields.io/badge/STATUS-Supported-238636) | Outgoing interception and incoming stream restoration, demonstrated in the live captures. |
+| **Google Gemini** | ![Beta](https://img.shields.io/badge/STATUS-Beta-9a6700) | Outgoing protobuf interception is implemented. Incoming restoration may buffer unexpectedly. |
+| **Claude** | ![Alpha](https://img.shields.io/badge/STATUS-Alpha-cf222e) | Interception is not currently supported. |
 
 Experimental integrations remain in the source and host permissions. Provider changes can affect compatibility.
 
@@ -128,29 +128,29 @@ If every student represented by that subtotal used ChatGPT with Cloak installed,
 
 ```sh
 npm ci
-npm run build:interceptor
+npm test
 ```
 
-Run the existing tests without rebuilding:
-
-```sh
-node --test tests/intercept.test.js tests/content.test.js
-```
-
-`npm test` also rebuilds through `pretest`. Reload the unpacked extension and refresh ChatGPT after runtime changes.
+`npm test` rebuilds the intercept bundle through `pretest`, then runs the repository suite. Reload the unpacked extension and refresh ChatGPT after runtime changes.
 
 The GitHub Pages site uses plain HTML, CSS and JavaScript. Its demos run without AI requests or access to the installed extension’s storage.
 
 ```sh
-node docs/serve.cjs
+npm run docs:serve
 # Open http://127.0.0.1:4173
 ```
 
-In another terminal, run `node docs/verify.cjs`. Use `node docs/benchmark.cjs` to reproduce the synthetic exercise. See the [website guide](docs/README.md) for publishing and packaging, and the [test guide](tests/README.md) for test details.
+In another terminal, run `npm run docs:verify`. Use `npm run docs:benchmark` to reproduce the synthetic exercise. See the [website guide](docs/README.md) for publishing and packaging, and the [test guide](tests/README.md) for test details.
 
 ---
 
-Licensed under [GPL-3.0](LICENSE). Built with [Compromise](https://github.com/spencermountain/compromise), [addressit](https://github.com/DamonOehlman/addressit), and [esbuild](https://github.com/evanw/esbuild).
+Licensed under [GPL-3.0-only](LICENSE). Built with [Compromise](https://github.com/spencermountain/compromise), [addressit](https://github.com/DamonOehlman/addressit), and [esbuild](https://github.com/evanw/esbuild).
+
+Cloak Copyright (C) 2026 L-Logix. Cloak is free software: you can redistribute it
+and/or modify it under the terms of the GNU General Public License as published
+by the Free Software Foundation, version 3 only. Cloak is distributed without
+any warranty; see [LICENSE](LICENSE) for details and [docs/THIRD_PARTY_NOTICES.txt](docs/THIRD_PARTY_NOTICES.txt)
+for third-party license notices.
 
 This is not an official congressional website.
 

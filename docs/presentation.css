@@ -11,3 +11,40 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline-color: #8
 
 .technical-results { margin: 26px 0 18px; max-width: 720px; color: #a0b9a8; font-size: 12px; line-height: 1.8; }
 .technical-results a { color: #baf5ce; text-decoration: underline; text-underline-offset: 3px; }
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  padding: 7px 10px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 700;
+  white-space: nowrap;
+  letter-spacing: .01em;
+}
+.status-chip > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+.status-supported {
+  color: #86efac;
+  background: #14301f;
+  border-color: #397c50;
+}
+.status-beta {
+  color: #fcd34d;
+  background: #332a12;
+  border-color: #79672f;
+}
+.status-alpha {
+  color: #fda4af;
+  background: #34161b;
+  border-color: #74404a;
+}

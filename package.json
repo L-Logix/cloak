@@ -2,9 +2,10 @@
   "name": "cloak-extension",
   "private": true,
   "version": "1.2.0",
-  "description": "Local-first browser extension for masking sensitive AI prompt details in chats",
+  "license": "GPL-3.0-only",
+  "description": "Local-first, private browser extension for masking sensitive AI prompt details in chats",
   "scripts": {
-    "build:interceptor": "esbuild intercept.js --bundle --minify --platform=browser --format=iife --target=chrome111 --outfile=intercept.bundle.js",
+    "build:interceptor": "esbuild intercept.js --bundle --minify --legal-comments=eof --platform=browser --format=iife --target=chrome111 --outfile=intercept.bundle.js",
     "pretest": "npm run build:interceptor",
     "test": "node --test \"tests/*.test.js\"",
     "docs:serve": "node docs/serve.cjs",
