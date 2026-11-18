@@ -92,7 +92,7 @@ The local vault stores token mappings so Cloak can restore the original values a
 
 ## Platform Compatibility & Current Status
 
-**ChatGPT is the only supported platform in this release.** The status matrix defines current compatibility.
+**ChatGPT is the only supported platform in this release.** The status table defines current compatibility.
 
 | Platform | Status | Current implementation |
 | :--- | :--- | :--- |
@@ -123,6 +123,7 @@ If every student represented by that subtotal used ChatGPT with Cloak installed,
 - Expand detection evaluation beyond the current synthetic fixtures.
 - Improve Gemini restoration and investigate Claude transport support.
 - Explore user-approved sharing of a specific detail only when a task needs it.
+- Make the system more robust to prevent crashes on AI system updates
 
 ## Development
 
