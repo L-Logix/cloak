@@ -1,4 +1,5 @@
-Third-party packages bundled into the Cloak website preview.
+These are the licenses of the third-party packages bundled into the Cloak website preview.
+
 
 --- compromise ---
 

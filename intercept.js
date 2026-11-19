@@ -1,3 +1,7 @@
+// Copyright (C) 2026 L-Logix
+// Licensed under the GNU General Public License v3.0 only.
+// SPDX-License-Identifier: GPL-3.0-only
+//
 // Cloak — main-world interceptor: masks outgoing prompts, restores tokens
 // in incoming replies. Injected into the MAIN world of the supported chat
 // sites (see manifest) — the only place a content script can reach the
@@ -39,7 +43,7 @@ const parseAddress = require('addressit');
   // Image/video requests need the full prompt (the model paints from context),
   // so those requests bypass masking entirely — see containsMediaIntent().
   const MEDIA_PATTERN = /\b(?:draw|generate|create|make)\s+(?:me\s+)?(?:an?\s+)?(?:image|picture|photo|illustration|video)\b|\bimage generation\b/i;
-
+  // BETA - Gemini's new processSession transport is a base64 protobuf form field, so we detect it and walk the protobuf instead of masking raw syntax. The pattern below is a cheap heuristic to avoid false positives: it looks for the form field names Gemini uses, and the count/offset fields that precede them. The actual protobuf is validated in parseProtobuf() and mapProtobufProse() below.
   // Gemini's processSession writes one form field per protobuf part:
   // count=2&ofs=0&req0___data__=<base64>&req1___data__=<base64>.
   const GEMINI_RPC_FORM_PATTERN = /^count=\d+&ofs=\d+&req\d+___data__=/;
@@ -67,14 +71,12 @@ Cloak will ask the user for consent and, if granted, will resend this conversati
   const REVEAL_MAGIC_PATTERN = /[*_`]*[ \t]*Requesting access to know (.+?) from Cloak[.!?,;]*[*_`]{0,3}[ \t]*/gi;
 
   // ---- Small helpers ------------------------------------------------------
-
   // Make a literal safe to embed in a RegExp (".", "(" etc. must stay literal).
   function escapeRegExp(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   // ---- Name detection -----------------------------------------------------
-
   // All plausible name strings in the prompt, longest first so longer names
   // mask before their substrings can be claimed.
   function personCandidates(text) {
@@ -87,7 +89,7 @@ Cloak will ask the user for consent and, if granted, will resend this conversati
         if (cleaned) candidates.add(cleaned);
       }
     } catch {
-      // Passes 2 and 3 still run.
+      // Passes 2 and 3 still run if fail detected.
     }
 
     // Pass 2: "my name is …" / "I'm …" introductions.
@@ -121,7 +123,7 @@ Cloak will ask the user for consent and, if granted, will resend this conversati
   }
 
   // Turn candidate strings into concrete spans in the text. Word-boundary
-  // lookarounds stop "bob" from matching inside "bobby" or "crowbar".
+  // lookarounds stop "bob" from matching inside "bobby" or "crowbar". 
   function findPersonSpans(text) {
     const spans = [];
     for (const candidate of personCandidates(text)) {
@@ -139,7 +141,6 @@ Cloak will ask the user for consent and, if granted, will resend this conversati
   }
 
   // ---- Address detection --------------------------------------------------
-
   // Grow an address past its street portion to swallow city / state / postal
   // code, so the whole address masks as ONE value.
   function extendAddressSpan(candidate, parsed, streetEnd) {
@@ -274,7 +275,6 @@ Cloak will ask the user for consent and, if granted, will resend this conversati
   }
 
   // ---- Token minting ------------------------------------------------------
-
   // Deterministic 6-char hash: the same value always maps to the same token,
   // so the vault stays deduped across page loads (djb2).
   function stableSuffixFor(value) {
@@ -485,7 +485,6 @@ Cloak will ask the user for consent and, if granted, will resend this conversati
   }
 
   // ---- Request classification ---------------------------------------------
-
   // Image/video generation needs the whole prompt to paint from, so those
   // requests skip masking (and we tell the page to show a heads-up banner).
   function containsMediaIntent(text) {
@@ -523,7 +522,6 @@ Cloak will ask the user for consent and, if granted, will resend this conversati
   }
 
   // ---- Response restoration -----------------------------------------------
-
   // Stream a response body through token restoration. Responses stream in
   // chunks, and a chunk boundary can split a token mid-way ("[PERSON_1" then
   // "_2pkqc9]"), so we hold back only the tail that could still be the start
@@ -779,7 +777,6 @@ Cloak will ask the user for consent and, if granted, will resend this conversati
   }
 
   // ---- Reveal protocol: prompt notice + reply scanner ----------------------
-
   // Append REVEAL_INSTRUCTION to the LAST prose field holding a token — in
   // Gemini's wire format that is the newest prompt. The tree is rebuilt
   // bottom-up so every length prefix stays correct.
@@ -989,7 +986,6 @@ Cloak will ask the user for consent and, if granted, will resend this conversati
   }
 
   // ---- Page wiring --------------------------------------------------------
-
   // Runs in a chat page's main world. Wraps fetch and XHR so every outgoing
   // chat request is rewritten and every incoming reply is restored.
   function install() {
@@ -1375,7 +1371,6 @@ Cloak will ask the user for consent and, if granted, will resend this conversati
   }
 
   // ---- Entry points --------------------------------------------------------
-
   // Node (the test suite) gets the internals via module.exports.
   if (typeof process !== 'undefined' && process.versions?.node && typeof module !== 'undefined') {
     module.exports = {

@@ -1,5 +1,9 @@
 <!doctype html>
 <!--
+  Copyright (C) 2026 L-Logix
+  Licensed under the GNU General Public License v3.0 only.
+  SPDX-License-Identifier: GPL-3.0-only
+
   Cloak — extension popup: 380×560 shell, page stage switched by bottom nav.
   Pages: home, try (live demo), vault, coverage, terms, settings.
   Scripts load in order: intercept.bundle.js exposes window.CloakPreview,
@@ -58,7 +62,7 @@
           <span class="site-mark" id="site-mark" aria-hidden="true">AI</span>
         </div>
 
-        <!-- Counters render as an odometer so changes roll instead of jump. -->
+        <!-- Counters render as an odometer so changes roll instead of jump from one to another. -->
         <section class="activity-section" aria-labelledby="home-heading">
           <div class="activity-heading">
             <div>
@@ -216,11 +220,11 @@
         </div>
         <div class="settings-list preference-list">
           <label class="setting-row" for="setting-restore">
-            <span><strong>Restore replies</strong><small>Replace Cloak tokens with originals</small></span>
+            <span><strong>Restore replies</strong><small>Replace Cloak tokens with the information from the original prompt</small></span>
             <input id="setting-restore" type="checkbox" data-setting="restoreResponses" checked>
           </label>
           <label class="setting-row" for="setting-badge">
-            <span><strong>Composer badge</strong><small>Show Cloak status by the chat box</small></span>
+            <span><strong>Composer badge</strong><small>Show Cloak status indicator by the chat box</small></span>
             <input id="setting-badge" type="checkbox" data-setting="showBadge" checked>
           </label>
         </div>
@@ -233,6 +237,14 @@
         <div class="settings-action-row">
           <span><strong>Activity totals</strong><small>Reset local dashboard counters</small></span>
           <button id="reset-activity" class="text-action" type="button">Reset</button>
+        </div>
+        <div class="settings-action-row">
+          <span><strong>Cloak license</strong><small>GNU GPL v3.0 only · © 2026 L-Logix</small></span>
+          <a class="text-action" href="LICENSE" target="_blank" rel="noopener">View</a>
+        </div>
+        <div class="settings-action-row">
+          <span><strong>Source and notices</strong><small>Download source and third-party licenses</small></span>
+          <a class="text-action" href="https://github.com/L-Logix/cloak" target="_blank" rel="noopener">Source</a>
         </div>
         <p class="settings-note"><span class="local-dot" aria-hidden="true"></span>Your vault stays in this browser.</p>
       </section>

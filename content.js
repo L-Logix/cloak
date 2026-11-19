@@ -1,3 +1,7 @@
+// Copyright (C) 2026 L-Logix
+// Licensed under the GNU General Public License v3.0 only.
+// SPDX-License-Identifier: GPL-3.0-only
+//
 // Cloak — content script, isolated world: bridges the popup
 // (chrome.storage) and the MAIN-world interceptor (postMessage).
 // Publishes CLOAK_CONFIG, persists the vault, accumulates counters,

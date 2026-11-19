@@ -1,3 +1,7 @@
+// Copyright (C) 2026 L-Logix
+// Licensed under the GNU General Public License v3.0 only.
+// SPDX-License-Identifier: GPL-3.0-only
+//
 // Cloak — popup controller: loads state from chrome.storage.local, renders
 // every page from one `state` object, writes changes back; storage.onChanged
 // keeps it live while open. The "Try it" page runs the real masking engine

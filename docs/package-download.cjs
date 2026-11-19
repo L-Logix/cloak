@@ -7,7 +7,9 @@ const python = process.env.CLOAK_PYTHON || 'python';
 const program = `
 import hashlib, json, pathlib, zipfile, sys
 root = pathlib.Path(sys.argv[1])
-files = ['manifest.json','popup.html','popup.js','styles.css','content.js','content.css','intercept.js','intercept.bundle.js','package.json','package-lock.json','LICENSE','README.md','tests/intercept.test.js','tests/content.test.js','tests/README.md']
+files = ['manifest.json','popup.html','popup.js','styles.css','content.js','content.css','intercept.js','intercept.bundle.js','package.json','package-lock.json','LICENSE','README.md','docs/THIRD_PARTY_NOTICES.txt','docs/LICENSE','docs/README.md','docs/serve.cjs','docs/verify.cjs','docs/package-download.cjs','docs/benchmark.cjs','docs/build-preview.cjs','tests/intercept.test.js','tests/content.test.js','tests/README.md']
+for icon in sorted((root / 'icons').glob('*.png')):
+    files.append((icon.relative_to(root)).as_posix())
 out = root / 'docs' / 'downloads'
 out.mkdir(exist_ok=True)
 archive = out / 'cloak-extension.zip'
