@@ -82,21 +82,6 @@
 .engineering-notes { display: flex; flex-direction: column; justify-content: space-between; gap: 22px; }
 .engineering-notes h3 { font-size: 19px; margin: 10px 0 8px; }
 .engineering-notes p { font-size: 12px; color: var(--muted); }
-.verification { border-block: 1px solid #2e4636; padding-block: 26px; margin-top: 38px; }
-.verification-header { display: flex; justify-content: space-between; align-items: center; gap: 25px; }
-.verification-header .eyebrow { color: #86efac; font-size: 8px; margin-bottom: 10px; }
-.verification-header h3 { font-size: 20px; font-weight: 500; }
-.verification-header button { padding: 13px 17px; font-size: 10px; }
-.check-results { list-style: none; padding: 0; margin: 24px 0 18px; display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
-.check-results li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 13px; background: #101e1666; border: 1px solid #2b4233; border-radius: 5px; font-size: 10px; }
-.check-results b { font: 8px Consolas,monospace; color: #91aa9a; }
-.check-results [data-pass=true] { border-color: #3b6748; background: #14301f80; }
-.check-results [data-pass=true] b { color: #86efac; }
-.check-results [data-pass=false] b { color: #fda4af; }
-.verification-footer { display: flex; justify-content: space-between; gap: 20px; font-size: 10px; }
-.verification-footer p { color: #acc8b6; }
-.verification-footer a { color: #86efac; }
-.verification-note { color: #96ac9e; font-size: 9px; margin-top: 9px; }
 .source-map { padding-top: 23px; }
 .source-map summary { cursor: pointer; display: flex; justify-content: space-between; font-size: 12px; color: #c0d8c8; list-style: none; }
 .source-map summary::-webkit-details-marker { display: none; }
@@ -134,7 +119,6 @@
  .engineering-grid { gap: 28px; grid-template-columns: 1.2fr 1fr; }
  .stream-controls { grid-template-columns: 1fr; }
  .stream-controls button { grid-column: 1; grid-row: auto; justify-self: start; }
- .check-results { grid-template-columns: repeat(2,1fr); }
  .interface-shell { gap: 40px; }
  .interface-copy h2 { font-size: 43px; }
  .idea-section .section-heading h2 { font-size: 42px; }
@@ -172,10 +156,6 @@
  .workbench-heading a { font-size: 9px; }
  .workbench-heading .lab-title { font-size: 8px; }
  .stream-output { font-size: 12px; }
- .verification-header { align-items: flex-start; flex-direction: column; gap: 18px; }
- .verification-header h3 { font-size: 19px; }
- .check-results { grid-template-columns: 1fr; }
- .verification-footer { flex-direction: column; gap: 12px; }
  .source-map > div { grid-template-columns: 1fr; }
  .install-top h2 { font-size: 40px; }
  .interface-shell { grid-template-columns: 1fr; gap: 25px; }

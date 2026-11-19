@@ -1,8 +1,8 @@
 {
   "archive": "cloak-extension.zip",
-  "sha256": "8249ed83ccdc78559b079d8a23d5cf9d2a7b0f86552643a42303222e4be010f9",
+  "sha256": "d22f4dd823ed16522eacadc5edc30ee4a6d652663750cbf032833f39dac68f7b",
   "files": {
-    "manifest.json": "d7b2d1bdc270a14fc625299ef959668eb07932fbef12665825d887dc46d6a0b8",
+    "manifest.json": "9f2a616d496fe6aea6406d63542e680f990d7485e50ed8f18c3082f4474f7708",
     "popup.html": "f8f62e7cf41c84dd9ef814dfaa6ea1da6219351c9f4293e6d97c311e325f821c",
     "popup.js": "322c2cb354b8abdd0477048d79fc1e19120afd7b0fa1570983d919729f40a406",
     "styles.css": "38b5ab33941cfcf00063745529984f0ebdffc5d25c326d0ac11493b98d950777",
@@ -10,21 +10,27 @@
     "content.css": "80776bc826d1f2565556e18f5581a7fb212a374c11bb996198f7cd80d93cf05a",
     "intercept.js": "eb2eff62307f89d1a6092c671c94628ae7e2a4b7a80ded36d052b766b85003a1",
     "intercept.bundle.js": "81f210d0211156c392013a53a8fbc25fa11d4bfbae14b714561c13acf779af1c",
-    "package.json": "2cfce9940de289083615b0bff83ee173df4d300c88bc30d72e3fa57c795be637",
+    "package.json": "a2fded5a48b6a8395e4e821716b917e8d11f9a04a48522517d466cc9ff81e53d",
     "package-lock.json": "8abee6ce28cb71293ac73ea0b32d8c5be6530113e5f8af252bfc5f63fc2212b0",
     "LICENSE": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809",
-    "README.md": "5ba87c6ceafc7663d33191f403051733df84c89ced5d606d7979ba04f03b9cd2",
+    "README.md": "9831dc2c9d4edc23e5f7227ac1f6e9bcb87b3e868ba8c1c30009ada44d73ad1e",
     "docs/THIRD_PARTY_NOTICES.txt": "1f18b9aafb57ab32dda7dded184588dabea7b839e54074413f5304c84d3dbd0a",
     "docs/LICENSE": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809",
     "docs/README.md": "bd853f740fc9b248346365847acfade5b95594c560822367300ea5f7300285ed",
-    "docs/serve.cjs": "0331ac143745ebcd5ff3b4a2376163c8ba5e488aad6cd2f3d3d97b5cf62cc16c",
+    "docs/serve.cjs": "5300c7468256477527e00f33b2636eca448cd29a90d6def63198ba50dcee0a16",
     "docs/verify.cjs": "f538d22e7b3216c32092131c2584a90584f4170643ad38b189ad3659f0d788ea",
     "docs/package-download.cjs": "a32fe7448897421a281c177765bd0b457dca9ee7689c79d401d56381c3ec4570",
     "docs/benchmark.cjs": "0538981204e5f3b15dc8b9f2c3aef306a1158226e071d2c6d998c2ed4a8b3aba",
     "docs/build-preview.cjs": "a61b0546c5f6b153e3102aed00e363ac1d8ec6e990ddebc13d79c2cab8accd64",
     "tests/intercept.test.js": "dc76b3b12ff00fcc864335b168f19ea170a419f001602f6dcfb81d4bc46d474c",
     "tests/content.test.js": "1cda0c40f0ddc18507a99f5af8d341aa622e4e1b8e0bbf9751a2dcca5623c741",
-    "tests/README.md": "0316884124b1fd954b7a43edc8076a608397d5631e33785af0bcb7c0a0696203"
+    "tests/README.md": "0316884124b1fd954b7a43edc8076a608397d5631e33785af0bcb7c0a0696203",
+    "icons/logo-128.png": "a5f869592c6279f0bfcdd222313ee5070ae829517d29fcd3b834cec4aaae6ea8",
+    "icons/logo-16.png": "e12e9788686a792a45bb8f41c1e013091c831b36751052f8d273582aca4c669c",
+    "icons/logo-256.png": "8677e4187245cb34a29e21529425abd02c9580864e523d826ce9b4b825163c64",
+    "icons/logo-32.png": "8da86498d77082174fb3af1ddf731b91dbe49f7be5dc2ca64d05dcb1510c7e11",
+    "icons/logo-48.png": "9b021660dd82045e3393e0c6293704c85d5ca3c73790f63e582c9349e70ff997",
+    "icons/logo-512.png": "bb3995db7bb6b2703be91b33938e02607f64436599a850114667d58aace3d000"
   },
   "verification": "Every archived file matches the current repository source byte-for-byte."
 }
