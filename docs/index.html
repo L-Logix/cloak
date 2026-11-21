@@ -36,6 +36,7 @@
   <link rel="stylesheet" href="refinement.css">
   <script src="motion.js" defer></script>
   <link rel="stylesheet" href="presentation.css">
+  <script src="analytics.js" defer></script>
 </head>
 <body>
   <!-- Google Tag Manager (noscript) -->
@@ -172,7 +173,7 @@
         <div class="hero-video-heading"><span class="status-dot"></span> WATCH CLOAK IN ACTION</div>
         <figure id="demo-video" class="hero-video-card">
           <div class="hero-video-frame">
-            <iframe src="https://www.youtube.com/embed/Q5fzbLAetjo?rel=0" title="Cloak demonstration video" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+            <iframe id="demo-video-frame" src="https://www.youtube.com/embed/Q5fzbLAetjo?rel=0&enablejsapi=1" title="Cloak demonstration video" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
           </div>
           <figcaption><span>Live demo · Masking and restoration</span><a href="https://www.youtube.com/watch?v=Q5fzbLAetjo" target="_blank" rel="noopener">Open on YouTube <span aria-hidden="true">↗</span></a></figcaption>
         </figure>
@@ -353,11 +354,17 @@ Analyze this history in three brief bullets: key patterns, missing information, 
 
       // Clicking the blurred backdrop closes without storing a choice
       panel.addEventListener('click', function (e) {
-        if (e.target === panel) closeModal();
+        if (e.target === panel) {
+          closeModal();
+          if (window.CloakTrack) window.CloakTrack('consent_choice', { choice: 'dismiss', method: 'backdrop' });
+        }
       });
       // Escape closes without storing a choice
       document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') closeModal();
+        if (e.key === 'Escape' && panel.classList.contains('open')) {
+          closeModal();
+          if (window.CloakTrack) window.CloakTrack('consent_choice', { choice: 'dismiss', method: 'escape' });
+        }
       });
 
       // First visit: show the modal. Returning visit: apply the stored choice silently.
