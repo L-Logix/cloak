@@ -23,7 +23,10 @@
     gtag('js', new Date());
     // GDPR default: no analytics storage until the visitor accepts in the consent modal
     gtag('consent', 'default', { analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
+    // Direct GA4 config for custom-event instrumentation (page_view left to GTM to avoid double-counting)
+    gtag('config', 'G-804P3BCVN0', { send_page_view: false });
   </script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-804P3BCVN0"></script>
   <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-NRP53CQN"></script>
   <link rel="stylesheet" href="site.css">
   <link rel="stylesheet" href="dark.css">
