@@ -151,7 +151,7 @@
       </div>
     </div>
   </div>
-
+<body>
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="header wrap">
     <a class="brand" href="#main" aria-label="Cloak home"><img src="assets/mark.svg" width="32" height="36" alt="">CLOAK<span class="brand-divider"></span><span class="brand-caption">AI PRIVACY LAYER</span></a>
@@ -319,53 +319,5 @@ Analyze this history in three brief bullets: key patterns, missing information, 
     <section id="install" class="install-section wrap"><div class="install-top"><p class="eyebrow"><span class="status-dot"></span> BUILT IN DISTRICT FOUR. BUILT FOR WHAT’S NEXT.</p><h2>Move AI forward.<br><em>Keep privacy with it.</em></h2><div class="hero-actions"><a class="button primary" href="downloads/cloak-extension.zip" download>Download Cloak <span aria-hidden="true">↓</span></a><a class="button secondary" href="https://github.com/L-Logix/cloak" target="_blank" rel="noopener">View source on GitHub <span aria-hidden="true">↗</span></a></div><p class="install-caption">Chrome 111+ · Ready-to-load extension · ZIP includes source, tests, license, and notices · No account required</p></div><ol class="install-steps"><li><span>01</span><div><h3>Download and extract.</h3><p>Download the ZIP and extract it. Keep the complete folder because <code>manifest.json</code>, scripts, styles, icons, and license files must remain together.</p></div></li><li><span>02</span><div><h3>Load in Chrome.</h3><p>Open <code>chrome://extensions</code>, enable <strong>Developer mode</strong>, choose <strong>Load unpacked</strong>, and select the extracted folder containing <code>manifest.json</code>.</p></div></li><li><span>03</span><div><h3>Open ChatGPT.</h3><p>Refresh <code>chatgpt.com</code>, open Cloak, confirm protection is on, and select which identifier categories to mask.</p></div></li></ol></section>
   </main>
   <footer class="wrap footer"><div><a class="brand" href="#main"><img src="assets/mark.svg" width="25" height="28" alt="">CLOAK</a><p>Privacy and progress, in the same conversation.</p></div><div><span>CONGRESSIONAL APP CHALLENGE · NC–04</span><p>Project showcase · Not an official congressional website.</p><a href="https://github.com/L-Logix/cloak">Source code ↗</a><a href="https://github.com/L-Logix/cloak/blob/unreleased/LICENSE">GPL-3.0 ↗</a><a href="https://www.congressionalappchallenge.us/wp-content/uploads/2026/05/2026-CAC-Rules.pdf">CAC judging criteria ↗</a></div></footer>
-
-  <script>
-    // Cloak cookies consent modal
-    (function () {
-      var panel = document.getElementById('cloak-cookies-consent-panel');
-      if (!panel) return;
-      var KEY = 'cloak_cookies_preference';
-
-      function applyConsent(granted) {
-        if (typeof gtag === 'function') {
-          gtag('consent', 'update', { analytics_storage: granted ? 'granted' : 'denied' });
-        }
-      }
-      function openModal() {
-        panel.classList.add('open');
-        var btn = panel.querySelector('.card-accept');
-        if (btn) btn.focus();
-      }
-      function closeModal() {
-        panel.classList.remove('open');
-      }
-      function decide(granted) {
-        try { localStorage.setItem(KEY, granted ? 'grant' : 'reject'); } catch (e) {}
-        applyConsent(granted);
-        closeModal();
-      }
-
-      // Accept / reject buttons
-      panel.querySelector('.card-accept').addEventListener('click', function () { decide(true); });
-      panel.querySelector('.card-reject').addEventListener('click', function () { decide(false); });
-
-      // Clicking the blurred backdrop closes without storing a choice
-      panel.addEventListener('click', function (e) {
-        if (e.target === panel) closeModal();
-      });
-      // Escape closes without storing a choice
-      document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') closeModal();
-      });
-
-      // First visit: show the modal. Returning visit: apply the stored choice silently.
-      var stored = null;
-      try { stored = localStorage.getItem(KEY); } catch (e) {}
-      if (stored === 'grant') applyConsent(true);
-      else if (stored === 'reject') applyConsent(false);
-      else openModal();
-    })();
-  </script>
 </body>
 </html>
