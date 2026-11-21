@@ -10,13 +10,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#080c0b">
   <meta name="description" content="Cloak is a zero-trust enterprise AI privacy proxy built with Manifest V3. It masks personal details locally before supported AI prompts leave the browser.">
-  <meta property="og:title" content="Cloak â€” Your ideas. Not your identity.">
+  <meta property="og:title" content="Cloak — Your ideas. Not your identity.">
   <meta property="og:description" content="Privacy and progress belong together. See Cloak in ChatGPT, explore the interface, and try masking personal details in your browser.">
   <meta property="og:type" content="website">
   <meta property="og:image" content="assets/readme/interface.png">
   <meta name="twitter:card" content="summary_large_image">
-  <title>Cloak â€” Your ideas. Not your identity.</title>
+  <title>Cloak — Your ideas. Not your identity.</title>
   <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    // GDPR default: no analytics storage until the visitor accepts in the consent modal
+    gtag('consent', 'default', { analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
+  </script>
+  <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-NRP53CQN"></script>
   <link rel="stylesheet" href="site.css">
   <link rel="stylesheet" href="dark.css">
   <script src="assets/preview-engine.js" defer></script>
@@ -29,93 +37,126 @@
   <script src="motion.js" defer></script>
   <link rel="stylesheet" href="presentation.css">
 </head>
-<script async src="https://www.googletagmanager.com/gtm.js?id=GTM-NRP53CQN"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-</script>
 <body>
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NRP53CQN"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
   <!-- Cloak cookies consent modal -->
-  <div id="cloak-cookies-consent" class="cloak-cookies-modal" aria-hidden="true" role="dialog" aria-label="Cloak cookies consent">
-    <div class="cloak-cookies-content">
-      <h3>Cloak cookies consent</h3>
+  <style>
+    /* Consent: centered modal over a blurred page backdrop */
+    .cloak-cookies-consent-panel {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(4, 7, 6, 0.55);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+      font-family: var(--font, 'Segoe UI', system-ui, -apple-system, sans-serif);
+    }
+    .cloak-cookies-consent-panel.open { display: flex; }
+    .cloak-cookies-consent-panel .consent-card {
+      width: min(420px, 100%);
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+      background: #080c0b;
+      border: 1px solid #24372c;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 24px 60px #000c, 0 0 30px #15803d14;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      animation: consentPop .28s ease-out;
+    }
+    @keyframes consentPop {
+      from { opacity: 0; transform: translateY(14px) scale(.97); }
+      to { opacity: 1; transform: none; }
+    }
+    .cloak-cookies-consent-panel .card-header {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+    .cloak-cookies-consent-panel .eyebrow {
+      font-size: 10px;
+      line-height: 1.5;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #6ee7a0;
+      margin: 0;
+    }
+    .cloak-cookies-consent-panel h3 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -.02em;
+      color: #ffffff;
+      margin: 0;
+    }
+    .cloak-cookies-consent-panel p {
+      font-size: 13px;
+      line-height: 1.6;
+      color: #a8b8ae;
+      margin: 0;
+    }
+    .cloak-cookies-consent-panel .card-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .cloak-cookies-consent-panel .card-actions .button {
+      flex: 1;
+      justify-content: center;
+      font-size: 13px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      border: 1px solid #3f4753;
+      background: #101317;
+      color: #e7ebf0;
+    }
+    .cloak-cookies-consent-panel .card-accept {
+      background: #15803d;
+      border-color: #15803d;
+      color: #fff;
+    }
+    .cloak-cookies-consent-panel .card-accept:hover {
+      background: #16a34a;
+      border-color: #16a34a;
+    }
+    .cloak-cookies-consent-panel .card-reject:hover {
+      background: #28323c;
+    }
+    @media (max-width: 420px) {
+      .cloak-cookies-consent-panel .card-actions { flex-direction: column; }
+    }
+  </style>
+
+  <div id="cloak-cookies-consent-panel" class="cloak-cookies-consent-panel" role="dialog" aria-modal="true" aria-label="Cloak cookies consent">
+    <div class="consent-card">
+      <div class="card-header">
+        <span class="eyebrow">Cookies consent</span>
+        <h3>Cloak cookies consent</h3>
+      </div>
       <p>We use Google Analytics to understand how the Cloak website is used. This helps us improve the extension and documentation.</p>
       <p>Google Analytics collects anonymous information about your visit, including pages viewed and time spent on the site. No personal identifying information is collected.</p>
-      <div class="cloak-cookies-actions">
-        <button id="cloak-accept-analytics" class="button primary">Accept analytics</button>
-        <button id="cloak-reject-analytics" class="button secondary">Reject analytics</button>
+      <div class="card-actions">
+        <button type="button" class="button card-accept">Accept analytics</button>
+        <button type="button" class="button card-reject">Reject analytics</button>
       </div>
     </div>
   </div>
-
-  <script>
-    // Cloak cookies consent management
-    (function() {
-      const consentModal = document.getElementById('cloak-cookies-consent');
-      const acceptBtn = document.getElementById('cloak-accept-analytics');
-      const rejectBtn = document.getElementById('cloak-reject-analytics');
-
-      // Check for existing preference
-      const storedPreference = localStorage.getItem('cloak_cookies_preference');
-      if (storedPreference) {
-        consentModal.setAttribute('aria-hidden', 'true');
-        if (storedPreference === 'reject') {
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('consent', 'deny');
-        } else {
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('consent', 'grant');
-        }
-        return;
-      }
-
-      function showModal() {
-        consentModal.setAttribute('aria-hidden', 'false');
-        consentModal.focus();
-      }
-
-      function hideModal() {
-        consentModal.setAttribute('aria-hidden', 'true');
-        localStorage.setItem('cloak_cookies_preference', 'grant');
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('consent', 'grant');
-      }
-
-      function rejectModal() {
-        consentModal.setAttribute('aria-hidden', 'true');
-        localStorage.setItem('cloak_cookies_preference', 'reject');
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('consent', 'deny');
-      }
-
-      // Show modal on page load
-      showModal();
-
-      // Accept button
-      acceptBtn.addEventListener('click', hideModal);
-
-      // Reject button
-      rejectBtn.addEventListener('click', rejectModal);
-
-      // Close on overlay click
-      consentModal.addEventListener('click', function(e) {
-        if (e.target === consentModal) {
-          rejectModal();
-        }
-      });
-    })();
-  </script>
 
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="header wrap">
     <a class="brand" href="#main" aria-label="Cloak home"><img src="assets/mark.svg" width="32" height="36" alt="">CLOAK<span class="brand-divider"></span><span class="brand-caption">AI PRIVACY LAYER</span></a>
     <nav aria-label="Main navigation"><a href="#interface">Interface</a><a href="#lab">Demo</a><a href="#project">How it works</a></nav>
-    <a class="nav-cta" href="https://github.com/L-Logix/cloak" target="_blank" rel="noopener">View on GitHub <span aria-hidden="true">â†—</span></a>
+    <a class="nav-cta" href="https://github.com/L-Logix/cloak" target="_blank" rel="noopener">View on GitHub <span aria-hidden="true">↗</span></a>
   </header>
   <main id="main">
     <section class="hero wrap" aria-labelledby="hero-title">
@@ -123,109 +164,109 @@
         <p class="eyebrow"><span class="status-dot"></span> AI PROGRESS. PERSONAL PRIVACY.</p>
         <h1 id="hero-title">Your ideas.<br>Not your <em>identity.</em></h1>
         <p class="intro"><strong>Cloak is a zero-trust enterprise AI privacy proxy.</strong> It uses a Chrome Manifest V3 main-world interceptor to replace detected personal details with reversible tokens before a prompt leaves the browser, then restores them locally in the reply.</p>
-        <div class="hero-actions"><a class="button primary" href="#demo-video">Watch the demo <span aria-hidden="true">â–¶</span></a><a class="button secondary" href="#install">Install locally <span aria-hidden="true">â†“</span></a><a class="hero-github" href="https://github.com/L-Logix/cloak" target="_blank" rel="noopener">View architecture on GitHub â†—</a></div>
+        <div class="hero-actions"><a class="button primary" href="#demo-video">Watch the demo <span aria-hidden="true">▶</span></a><a class="button secondary" href="#install">Install locally <span aria-hidden="true">↓</span></a><a class="hero-github" href="https://github.com/L-Logix/cloak" target="_blank" rel="noopener">View architecture on GitHub ↗</a></div>
         <div class="compatibility"><span>WORKS WITH</span><strong>ChatGPT</strong><span>SUPPORTED RELEASE</span></div><p class="hero-principle">Local detection. Local vault. No Cloak server.</p>
       </div>
       <div class="product-hero hero-video-panel" aria-label="Cloak demonstration video">
         <div class="product-orbit" aria-hidden="true"></div>
         <div class="hero-video-heading"><span class="status-dot"></span> WATCH CLOAK IN ACTION</div>
-        <div class="hero-video-heading"><span class="status-dot"></span> WATCH CLOAK IN ACTION</div>
+        <figure id="demo-video" class="hero-video-card">
           <div class="hero-video-frame">
-          <!-- Video embed replaced - YouTube geo-restriction avoided -->
-
-
-
-
-
+            <iframe src="https://www.youtube.com/embed/Q5fzbLAetjo?rel=0" title="Cloak demonstration video" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+          </div>
+          <figcaption><span>Live demo · Masking and restoration</span><a href="https://www.youtube.com/watch?v=Q5fzbLAetjo" target="_blank" rel="noopener">Open on YouTube <span aria-hidden="true">↗</span></a></figcaption>
+        </figure>
+        <a class="product-gallery-link" href="#interface">Explore the actual interface <span aria-hidden="true">↗</span></a>
+      </div>
     </section>
-    <div class="project-strip"><div class="wrap"><span class="strip-label">BUILT FOR THE CONGRESSIONAL APP CHALLENGE</span><span>North Carolina <b>04</b><span class="strip-divider">/</span>Rep. Valerie Foushee</span><a href="#project">Explore the project <span aria-hidden="true">â†“</span></a></div></div>
+    <div class="project-strip"><div class="wrap"><span class="strip-label">BUILT FOR THE CONGRESSIONAL APP CHALLENGE</span><span>North Carolina <b>04</b><span class="strip-divider">/</span>Rep. Valerie Foushee</span><a href="#project">Explore the project <span aria-hidden="true">↓</span></a></div></div>
 
     <section id="how-it-works" class="section wrap idea-section">
-      <div class="section-heading"><div><p class="eyebrow">01 â€” THE IDEA</p><h2>Privacy or progress?<br><em>Thatâ€™s a false choice.</em></h2></div><p>Cloak starts with a question from the Research Triangle: can we use AI without handing over personal details? Built by an eighth-grade student in NCâ€“04, Cloak answers at the network layer.</p></div>
-      <p class="proof-kicker">NORTH CAROLINA Â· THE PRIVACY CHALLENGE</p>
+      <div class="section-heading"><div><p class="eyebrow">01 — THE IDEA</p><h2>Privacy or progress?<br><em>That’s a false choice.</em></h2></div><p>Cloak starts with a question from the Research Triangle: can we use AI without handing over personal details? Built by an eighth-grade student in NC–04, Cloak answers at the network layer.</p></div>
+      <p class="proof-kicker">NORTH CAROLINA · THE PRIVACY CHALLENGE</p>
       <div class="proof-numbers" aria-label="Documented restrictions, community size, and modeled sensitive message volume">
-<div><strong class="rolling-number" data-number="57">57</strong><span>NC organizations with AI privacy limits &amp; guidance</span><small><a href="#impact-sources">57 named sources Â· Not a statewide total â†—</a></small></div>
-<div><strong class="rolling-number" data-number="267382">267,382</strong><span>Student enrollments at 14 cited universities</span><small><a href="#impact-sources">Fall 2025 Â· Community size, not people blocked â†—</a></small></div>
-<div><strong class="rolling-number" data-number="97274">97,274</strong><span>Sensitive messages per day in the full-use scenario</span><small><a href="#impact-sources">â‰ˆ 35.5 million/year Â· View assumptions â†—</a></small></div>
+<div><strong class="rolling-number" data-number="57">57</strong><span>NC organizations with AI privacy limits &amp; guidance</span><small><a href="#impact-sources">57 named sources · Not a statewide total ↗</a></small></div>
+<div><strong class="rolling-number" data-number="267382">267,382</strong><span>Student enrollments at 14 cited universities</span><small><a href="#impact-sources">Fall 2025 · Community size, not people blocked ↗</a></small></div>
+<div><strong class="rolling-number" data-number="97274">97,274</strong><span>Sensitive messages per day in the full-use scenario</span><small><a href="#impact-sources">≈ 35.5 million/year · View assumptions ↗</a></small></div>
 </div>
-      <div class="proof-followthrough"><p>If every student in this subtotal used ChatGPT with Cloak, that is an estimated <strong>97,274 sensitive prompts a day to protect.</strong> Cloak masks detected identifiers; this models exposure, not verified prevention.</p><a href="#lab">See Cloak in action <span aria-hidden="true">â†“</span></a></div>
+      <div class="proof-followthrough"><p>If every student in this subtotal used ChatGPT with Cloak, that is an estimated <strong>97,274 sensitive prompts a day to protect.</strong> Cloak masks detected identifiers; this models exposure, not verified prevention.</p><a href="#lab">See Cloak in action <span aria-hidden="true">↓</span></a></div>
       <details id="impact-sources" class="impact-sources"><summary>All 57 organizations, sources &amp; calculations <span aria-hidden="true">+</span></summary>
-<p>Reviewed October 26, 2026. 57 named organizations: 12 government Â· 2 business Â· 14 kâ€“12 education Â· 27 higher education Â· 2 healthcare. North Carolina organizations with published AI-specific privacy limits, including policies, official guidance and recommendations, approved-tool requirements, supplier rules, and a clinical AI-device restriction. Not a census or a count of blanket bans. One entry per named organization, not per rule, school, department, branch, or facility. Department-specific rules are labeled and counted once under their parent organization. State agencies are included only with separately cited publications; no other agencies are inferred from statewide coverage. The UNC System Office is counted only for its own administrative operations, separately from the universities. Advocate Health and its Atrium Health operations count as one organization.</p>
-<h3>Government Â· 12</h3><ul><li><a href="https://it.nc.gov/programs/ai-policy/use-publicly-available-generative-ai">North Carolina Department of Information Technology â†—</a><span>Published guidance prohibits personal or confidential information in public generative AI. Counted once, not once per covered agency.</span></li>
-<li><a href="https://policies.ncdhhs.gov/wp-content/uploads/Acceptable_Use_for_DHHS_Information_Systems_v2025_fin.pdf">North Carolina Department of Health and Human Services â†—</a><span>Its own September 2025 acceptable-use policy bars PII and confidential information from public AI tools and requires approval for installing public/free AI.</span></li>
-<li><a href="https://www.nagsheadnc.gov/DocumentCenter/View/3709/Board-of-Commissioners-Policy---Personnel-Policy">Town of Nags Head â†—</a><span>July 2026 personnel policy, page 38: employees must not put sensitive or confidential data into public generative AI; connecting town systems or data requires IT review.</span></li>
-<li><a href="https://www.commercerecovery.nc.gov/pii-policy">North Carolina Department of Commerce â†—</a><span>The Division of Community Revitalization's PII policy bars PII in generative AI without explicit authorization and applicable security controls. Counted once for Commerce; the cited scope is DCR programs and partners.</span></li>
-<li><a href="https://www.buncombecounty.org/common/policies/Acceptable%20Use%20Policy.pdf">Buncombe County â†—</a><span>The April 2026 acceptable-use policy allows only County-approved AI for work and prohibits putting PII, PHI, or criminal justice information into AI systems.</span></li>
-<li><a href="https://www.charlottenc.gov/files/assets/police/documents/directives/cmpddirectives.pdf">City of Charlotte â†—</a><span>Charlotte-Mecklenburg Police Department directive 800-001 prohibits employees from entering confidential information into third-party AI. Counted once for the city; the cited restriction applies to CMPD.</span></li>
-<li><a href="https://evp.nc.gov/_entity/annotation/e33bde98-5029-f111-8342-001dd803db57/api">Town of Cary â†—</a><span>March 2026 independent-auditor RFP 354-FN26-23, page 52: published contractor terms prohibit using Cary data or derivatives with AI or machine learning. A procurement restriction, not a blanket employee AI ban.</span></li>
-<li><a href="https://www.nccourts.gov/assets/documents/local-rules-forms/Filed%20AI%20Revised%20Admin%20Order%202025.pdf">North Carolina Judicial Branch (Cabarrus Superior Court) â†—</a><span>Cabarrus Superior Court Administrative Order 25-09, filed December 8, 2025, restricts confidential, privileged, sealed and other protected information in public AI absent reliable data-handling assurances. District-specific order; no other courts or law firms inferred.</span></li>
-<li><a href="https://www.ncbar.gov/for-lawyers/ethics-and-governing-rules/ethics-opinions/opinions/2024-formal-ethics-opinion-1/">North Carolina State Bar â†—</a><span>2024 Formal Ethics Opinion 1 requires lawyers to protect client confidentiality and use sufficiently secure AI; it advises generally avoiding client-specific information in public AI. Counted once as the issuing regulator, not as a count of law firms or an employee ban.</span></li>
-<li><a href="https://user-kcmpnye.cld.bz/Best-Practices-and-Guidelines-for-ChatGPT-and-Similar-AI-Mod/2/">City of Greensboro â†—</a><span>City IT guidance prohibits uploading confidential information, PII, login credentials and city operational documents to AI chatbots; it also prohibits using chatbots to find private information about employees or residents.</span></li>
-<li><a href="https://centralina.org/wp-content/uploads/2024/02/Union-County-Generative-AI-Guidance-Document.pdf">Union County â†—</a><span>Employee guidance published through Centralina Regional Council bars employee information, software code and county proprietary data from ChatGPT and similar tools. A September 2025 county bulletin confirms updated guidance remains in use; this public copy predates that update.</span></li>
-<li><a href="https://content.govdelivery.com/attachments/NCSBE/2024/01/16/file_attachments/2749425/NCDPI%20Generative%20AI%20Implementation%20Recommendations%20and%20Considerations%20for%20PK-13%20Public%20Schools.pdf">North Carolina Department of Public Instruction â†—</a><span>Its January 2024 published school implementation guidance instructs users not to type, paste or upload PII into generative AI, including student IDs. Counted once as the issuing agencyâ€™s recommendations; no additional school districts are inferred from statewide reach.</span></li></ul>
-<h3>Business Â· 2</h3><ul><li><a href="https://www.truist.com/content/dam/truist-bank/us/en/documents/info/truist-third-party-information-security-specifications.pdf">Truist â†—</a><span>Supplier security specifications prohibit putting Truist or client sensitive information into a third-party vendor's open-source generative AI tool. This is a supplier restriction, not a blanket employee ban.</span></li>
-<li><a href="https://www.sas.com/en_us/trust-center/sas-trust-ai.html">SAS Institute â†—</a><span>The Cary-headquartered companyâ€™s published employee GenAI policy summary requires privacy protection, safeguards for confidential information, and review of AI capabilities before onboarding. Counted as privacy and approval controls, not a prohibition on all AI use.</span></li></ul>
-<h3>Kâ€“12 education Â· 14</h3><ul><li><a href="https://www.wilkescountyschools.org/apps/pages/generative-ai/">Wilkes County Schools â†—</a><span>District guidelines say PII, confidential information, and sensitive information must never be entered into generative AI tools or large language models.</span></li>
-<li><a href="https://resources.finalsite.net/images/v1755644634/cmsk12ncus/c0hjknh9dsvia3ca0bic/CMSGenerativeAIGuidance2025-26Public.pdf">Charlotte-Mecklenburg Schools â†—</a><span>District guidance prohibits confidential or sensitive information, including student data, in AI systems unless specifically approved for that purpose with required privacy and security controls.</span></li>
-<li><a href="https://www.wsfcs.k12.nc.us/article/2665802">Winston-Salem/Forsyth County Schools â†—</a><span>The January 2026 district announcement limits secondary students to selected AI platforms meeting district safety, data privacy, and appropriate-use requirements. This is conditional access, not a blanket ban.</span></li>
-<li><a href="https://files-backend.assets.thrillshare.com/documents/asset/uploaded_file/4467/Scs/7b28ad67-8687-4be1-8dfa-ecdb52390710/3221_9-22-25.pdf?disposition=inline">Stokes County Schools â†—</a><span>Policy 3221 directs students and staff never to enter their own or others' personal information into generative AI and requires checking tool compliance with technology staff.</span></li>
-<li><a href="https://campussuite-storage.s3.amazonaws.com/prod/1559039/252d940a-b7a2-11ea-a606-121cb31c8405/2960156/3e2720ee-3b0e-11f0-8419-0a58a9feac02/file/AI%20Guidelines%20Staff.pdf">McDowell County Schools â†—</a><span>Staff AI guidance directs educators to avoid entering PII or confidential information, including student and staff information, into AI systems.</span></li>
-<li><a href="https://resources.finalsite.net/images/v1754337961/pamlicoschoolsorg/zzh4sddber8dwjrjxmjk/PamlicoCountySchoolsGenerativeAIStudentGuidlines211.pdf">Pamlico County Schools â†—</a><span>District AI literacy guidance directs users to avoid PII or confidential information in AI systems, including contact details, demographics, and rosters.</span></li>
-<li><a href="https://www.nhcs.net/divisions/instruction-and-academic-accountability/curriculum-instruction/nhcs-gen-ai">New Hanover County Schools â†—</a><span>District guidance prohibits confidential information and PII in generative AI, prohibits unapproved wearable/ambient AI, and disallows agentic AI on district-connected accounts because of student-data concerns.</span></li>
-<li><a href="https://sites.google.com/wcpss.net/library-media-services/wakemedia-monthly/may-2026">Wake County Public School System â†—</a><span>The district's Library Media Services May 2026 guidance says entering PII into AI tools is not recommended. Counted as an official privacy recommendation, not a binding prohibition.</span></li>
-<li><a href="https://www.asheschools.org/parentsstudents/student-programs-and-policies/ai-dashboard">Ashe County Schools â†—</a><span>District guidance limits AI feedback submissions to work without personally identifiable information. Its published AI dashboard also reproduces state guidance against entering PII.</span></li>
-<li><a href="https://www.cabarrus.k12.nc.us/105238_3">Cabarrus County Schools â†—</a><span>District AI guidelines tell students not to enter personal information into AI platforms and prohibit violating privacy by entering personal or sensitive data. Approved tools and assignment-specific permission are also required.</span></li>
-<li><a href="https://files-backend.assets.thrillshare.com/documents/asset/uploaded_file/3653/Ccs/5555f982-23c4-4f73-8519-4f1bd26bdbb4/25-26_CCS_Student_Handbook___Code_of_Conduct_w.pdf?disposition=inline">Camden County Schools â†—</a><span>The 2025â€“26 handbookâ€™s AI guidelines, printed page 69, advise avoiding sensitive data such as student IDs, grades, signatures and account credentials in AI tools. Users must review data practices and consult district technology staff when security is uncertain.</span></li>
-<li><a href="https://sites.google.com/gcs.k12.nc.us/gcps-ai-dashboard/faq">Granville County Public Schools â†—</a><span>The districtâ€™s AI FAQ says tools collecting unnecessary personal information are not allowed. AI tools undergo data-privacy, bias and educational-value review before approval, alongside district privacy requirements.</span></li>
-<li><a href="https://www.greensboroday.org/academics/artificial-intelligence-at-gds/ai-safety-data-privacy">Greensboro Day School â†—</a><span>School AI guidance permits only vetted services, requires data minimization and prohibits sharing PII under its responsible-use policy. It identifies a limited allowance for necessary student names in approved tools using school accounts.</span></li>
-<li><a href="https://www.da.org/about/newsroom/magazine/news-post-da/~board/news/post/da-unveils-generative-ai-framework-for-faculty-and-staff">Durham Academy â†—</a><span>Its published faculty/staff AI framework marks sensitive-data handling and surveillance as high-risk â€œRed Lightâ€ uses to avoid. Counted as official risk guidance, not a blanket AI ban.</span></li></ul>
-<h3>Higher education Â· 27</h3><ul><li><a href="https://ai.ncsu.edu/ai-tools/">NC State University â†—</a><span>Sensitive-data use depends on approved tools; other uses of Red or Purple data require an IT purchase compliance review.</span></li>
-<li><a href="https://hub.ncat.edu/administration/its/ai/ai-data-governance.php">North Carolina A&amp;T State University â†—</a><span>Confidential data is prohibited in generative AI; sensitive data requires approved tools, department authorization, and anonymization where possible.</span></li>
-<li><a href="https://oarc.duke.edu/our-focus-areas/privacy/data-governance-and-protection-duke/">Duke University â†—</a><span>Only public-classified data may be submitted to public AI tools. This university source excludes Duke University Health System.</span></li>
-<li><a href="https://www.cpcc.edu/policies-and-procedures/policies/209-use-of-college-information-technologies">Central Piedmont Community College â†—</a><span>Restricted or sensitive information cannot enter public or unapproved AI tools. Sensitive-data use in approved platforms still requires applicable IT approval.</span></li>
-<li><a href="https://ai.appstate.edu/guidance/data-security">Appalachian State University â†—</a><span>Guidance bars sensitive or confidential information from AI chat interfaces not approved for that data and restricts unauthorized tools.</span></li>
-<li><a href="https://oneit.charlotte.edu/innovation/artificial-intelligence/security-checklist/">UNC Charlotte â†—</a><span>The security checklist directs users not to enter confidential, legally restricted, or Level 3 university data into AI tools.</span></li>
-<li><a href="https://ai.uncg.edu/governance/permissible-use-cases/">UNC Greensboro â†—</a><span>Sensitive and nonpublic data require the stated exceptions or written review and approval; unapproved AI tools must not receive protected information.</span></li>
-<li><a href="https://ai.ecu.edu/using-generative-ai-at-ecu/">East Carolina University â†—</a><span>Protected institutional data requires approved tools or locally operated tools on ECU-managed devices; ChatGPT research use requires case-specific approval.</span></li>
-<li><a href="https://www.uncw.edu/research/projects/ai-hub/responsible-ai-use">UNC Wilmington â†—</a><span>Responsible-use guidance directs users to avoid entering sensitive or regulated university data into publicly available AI tools.</span></li>
-<li><a href="https://www.wcu.edu/learn/academic-services/it/ai/student-guide.aspx">Western Carolina University â†—</a><span>The student guide describes limits on sensitive and FERPA-protected information in AI systems and use of university-approved tools with privacy protections.</span></li>
-<li><a href="https://www.wssu.edu/academics/ai-at-wssu/ai-policy-guidelines.html">Winston-Salem State University â†—</a><span>Published guidance says never to enter confidential, sensitive, or FERPA-protected information into AI tools while broader institutional guidelines are being developed.</span></li>
-<li><a href="https://services.uncfsu.edu/TDClient/30/Portal/Requests/Service/152/Microsoft-Copilot-Chat">Fayetteville State University â†—</a><span>Copilot Chat approval covers only data tiers 0 and 1; confidential and restricted data are not approved.</span></li>
-<li><a href="https://uncp.edu/about/administration/policies-procedures-reports/pol-08-00-01-electronic-information-management-and-security-policy.html">UNC Pembroke â†—</a><span>Section 4.6 prohibits university protected or sensitive data in public AI without express authorization and requires appropriate risk assessment.</span></li>
-<li><a href="https://www.waketech.edu/catalog/campus-policies-and-procedures">Wake Technical Community College â†—</a><span>College policy requires written CIO consent before confidential institutional or FERPA-protected student data is submitted to, ingested by, or used to train generative AI.</span></li>
-<li><a href="https://www.durhamtech.edu/policies-and-procedures/academic-integrity">Durham Technical Community College â†—</a><span>The AI section directs both employees and students to avoid putting personal, confidential, or sensitive data into public AI tools.</span></li>
-<li><a href="https://www.elon.edu/u/fa/technology/artificial-intelligence/">Elon University â†—</a><span>AI data-security guidance requires the data owner's permission before confidential information or sensitive university data is shared.</span></li>
-<li><a href="https://ai.wfu.edu/commercial-data-protection/">Wake Forest University â†—</a><span>Guidance directs users to approved tools for university data and prohibits pasting sensitive student, personal, medical, or research data into free or personal AI accounts.</span></li>
-<li><a href="https://www.davidson.edu/offices-and-services/technology-innovation/it-guidelines-policies/artificial-intelligence-policy">Davidson College â†—</a><span>Internal and restricted data require college-provided platforms; confidential data requires Information Security review. The policy was last reviewed in March 2026.</span></li>
-<li><a href="https://nccu.teamdynamix.com/TDClient/1852/Portal/KB/Article/171201/AI-Use-at-NCCU">North Carolina Central University â†—</a><span>ITS guidance prohibits confidential and highly restricted data in AI tools, requires approved tools for university work, and bars personal AI accounts from processing university data.</span></li>
-<li><a href="https://ai.unc.edu/staff-generative-ai-usage-guidance/">University of North Carolina at Chapel Hill â†—</a><span>Staff guidance requires Information Security risk assessment and Data Governance Oversight Group approval before sensitive information may enter a generative AI tool.</span></li>
-<li><a href="https://myapps.northcarolina.edu/it/amplify/">UNC System Office â†—</a><span>The System Office's Amplify rules prohibit protected identifiers, financial account information, and HIPAA-, GLBA-, and CJIS-protected data. Counts the administrative office only, separately from universities.</span></li>
-<li><a href="https://www.alamancecc.edu/guide-to-ai-use.php">Alamance Community College â†—</a><span>Its academic AI guide directs students and faculty never to enter confidential or personal data into AI tools.</span></li>
-<li><a href="https://www.beaufortccc.edu/wp-content/uploads/2025/06/6-28_Generative-Artificial-Intelligence-AI-Use-Policy.pdf">Beaufort County Community College â†—</a><span>Policy 6.28 prohibits staff and faculty from processing sensitive college data in unauthorized AI/cloud services and prohibits AI recording of meetings.</span></li>
-<li><a href="https://reference.carteret.edu/artificial-intelligence-ai-policy">Carteret Community College â†—</a><span>Policy 5.19, approved May 2026, bars confidential, regulated, proprietary, or otherwise protected data from public AI tools.</span></li>
-<li><a href="https://libguides.rccc.edu/AI/home">Rowan-Cabarrus Community College â†—</a><span>The college library's AI safety guidance directs users not to share personal, confidential, or sensitive information with AI. This is published guidance, not a campus-wide AI ban.</span></li>
-<li><a href="https://abtech.edu/program-finder/academic/radiography/radiography-program-student-handbook/radiography-program-clinical-procedures">Asheville-Buncombe Technical Community College â†—</a><span>Radiography clinical procedures prohibit AI-enabled or recording-capable wearables in clinical and confidential areas because of PHI capture risks. This is a program/device restriction; Cloak does not address wearable recording.</span></li>
-<li><a href="https://assets.campbell.edu/wp-content/uploads/sites/22/2025/07/DO_Academic_Bulletin_2025-2026.pdf">Campbell University â†—</a><span>The School of Osteopathic Medicine's published 2025â€“26 bulletin permits course-content uploads only to Campbell-authenticated Copilot, citing intellectual property and data privacy. It prohibits those uploads to open AI systems; scope is that school.</span></li></ul>
-<h3>Healthcare Â· 2</h3><ul><li><a href="https://atriumhealth.org/-/media/wakeforest/clinical/files/about-us/codeofconductadvocatehealthenterprise91225">Advocate Health (including Atrium Health) â†—</a><span>The enterprise Code of Conduct prohibits unapproved generative AI tools from interacting with confidential or restricted data. Counted once for the parent organization, including its NC Atrium Health operations; not once per hospital.</span></li>
-<li><a href="https://www.labcorp.com/content/dam/labcorp/files/compliance/2147953_EnterpriseCodeofConduct%202026_FINAL.pdf">Labcorp â†—</a><span>February 2026 Code of Conduct, page 18: employees may use only AI tools vetted for privacy, security, and protection of sensitive and personal information. Burlington-headquartered company; no global employee count is added.</span></li></ul>
-<h3>Population subtotal Â· 14 universities</h3>
+<p>Reviewed October 26, 2026. 57 named organizations: 12 government · 2 business · 14 k–12 education · 27 higher education · 2 healthcare. North Carolina organizations with published AI-specific privacy limits, including policies, official guidance and recommendations, approved-tool requirements, supplier rules, and a clinical AI-device restriction. Not a census or a count of blanket bans. One entry per named organization, not per rule, school, department, branch, or facility. Department-specific rules are labeled and counted once under their parent organization. State agencies are included only with separately cited publications; no other agencies are inferred from statewide coverage. The UNC System Office is counted only for its own administrative operations, separately from the universities. Advocate Health and its Atrium Health operations count as one organization.</p>
+<h3>Government · 12</h3><ul><li><a href="https://it.nc.gov/programs/ai-policy/use-publicly-available-generative-ai">North Carolina Department of Information Technology ↗</a><span>Published guidance prohibits personal or confidential information in public generative AI. Counted once, not once per covered agency.</span></li>
+<li><a href="https://policies.ncdhhs.gov/wp-content/uploads/Acceptable_Use_for_DHHS_Information_Systems_v2025_fin.pdf">North Carolina Department of Health and Human Services ↗</a><span>Its own September 2025 acceptable-use policy bars PII and confidential information from public AI tools and requires approval for installing public/free AI.</span></li>
+<li><a href="https://www.nagsheadnc.gov/DocumentCenter/View/3709/Board-of-Commissioners-Policy---Personnel-Policy">Town of Nags Head ↗</a><span>July 2026 personnel policy, page 38: employees must not put sensitive or confidential data into public generative AI; connecting town systems or data requires IT review.</span></li>
+<li><a href="https://www.commercerecovery.nc.gov/pii-policy">North Carolina Department of Commerce ↗</a><span>The Division of Community Revitalization's PII policy bars PII in generative AI without explicit authorization and applicable security controls. Counted once for Commerce; the cited scope is DCR programs and partners.</span></li>
+<li><a href="https://www.buncombecounty.org/common/policies/Acceptable%20Use%20Policy.pdf">Buncombe County ↗</a><span>The April 2026 acceptable-use policy allows only County-approved AI for work and prohibits putting PII, PHI, or criminal justice information into AI systems.</span></li>
+<li><a href="https://www.charlottenc.gov/files/assets/police/documents/directives/cmpddirectives.pdf">City of Charlotte ↗</a><span>Charlotte-Mecklenburg Police Department directive 800-001 prohibits employees from entering confidential information into third-party AI. Counted once for the city; the cited restriction applies to CMPD.</span></li>
+<li><a href="https://evp.nc.gov/_entity/annotation/e33bde98-5029-f111-8342-001dd803db57/api">Town of Cary ↗</a><span>March 2026 independent-auditor RFP 354-FN26-23, page 52: published contractor terms prohibit using Cary data or derivatives with AI or machine learning. A procurement restriction, not a blanket employee AI ban.</span></li>
+<li><a href="https://www.nccourts.gov/assets/documents/local-rules-forms/Filed%20AI%20Revised%20Admin%20Order%202025.pdf">North Carolina Judicial Branch (Cabarrus Superior Court) ↗</a><span>Cabarrus Superior Court Administrative Order 25-09, filed December 8, 2025, restricts confidential, privileged, sealed and other protected information in public AI absent reliable data-handling assurances. District-specific order; no other courts or law firms inferred.</span></li>
+<li><a href="https://www.ncbar.gov/for-lawyers/ethics-and-governing-rules/ethics-opinions/opinions/2024-formal-ethics-opinion-1/">North Carolina State Bar ↗</a><span>2024 Formal Ethics Opinion 1 requires lawyers to protect client confidentiality and use sufficiently secure AI; it advises generally avoiding client-specific information in public AI. Counted once as the issuing regulator, not as a count of law firms or an employee ban.</span></li>
+<li><a href="https://user-kcmpnye.cld.bz/Best-Practices-and-Guidelines-for-ChatGPT-and-Similar-AI-Mod/2/">City of Greensboro ↗</a><span>City IT guidance prohibits uploading confidential information, PII, login credentials and city operational documents to AI chatbots; it also prohibits using chatbots to find private information about employees or residents.</span></li>
+<li><a href="https://centralina.org/wp-content/uploads/2024/02/Union-County-Generative-AI-Guidance-Document.pdf">Union County ↗</a><span>Employee guidance published through Centralina Regional Council bars employee information, software code and county proprietary data from ChatGPT and similar tools. A September 2025 county bulletin confirms updated guidance remains in use; this public copy predates that update.</span></li>
+<li><a href="https://content.govdelivery.com/attachments/NCSBE/2024/01/16/file_attachments/2749425/NCDPI%20Generative%20AI%20Implementation%20Recommendations%20and%20Considerations%20for%20PK-13%20Public%20Schools.pdf">North Carolina Department of Public Instruction ↗</a><span>Its January 2024 published school implementation guidance instructs users not to type, paste or upload PII into generative AI, including student IDs. Counted once as the issuing agency’s recommendations; no additional school districts are inferred from statewide reach.</span></li></ul>
+<h3>Business · 2</h3><ul><li><a href="https://www.truist.com/content/dam/truist-bank/us/en/documents/info/truist-third-party-information-security-specifications.pdf">Truist ↗</a><span>Supplier security specifications prohibit putting Truist or client sensitive information into a third-party vendor's open-source generative AI tool. This is a supplier restriction, not a blanket employee ban.</span></li>
+<li><a href="https://www.sas.com/en_us/trust-center/sas-trust-ai.html">SAS Institute ↗</a><span>The Cary-headquartered company’s published employee GenAI policy summary requires privacy protection, safeguards for confidential information, and review of AI capabilities before onboarding. Counted as privacy and approval controls, not a prohibition on all AI use.</span></li></ul>
+<h3>K–12 education · 14</h3><ul><li><a href="https://www.wilkescountyschools.org/apps/pages/generative-ai/">Wilkes County Schools ↗</a><span>District guidelines say PII, confidential information, and sensitive information must never be entered into generative AI tools or large language models.</span></li>
+<li><a href="https://resources.finalsite.net/images/v1755644634/cmsk12ncus/c0hjknh9dsvia3ca0bic/CMSGenerativeAIGuidance2025-26Public.pdf">Charlotte-Mecklenburg Schools ↗</a><span>District guidance prohibits confidential or sensitive information, including student data, in AI systems unless specifically approved for that purpose with required privacy and security controls.</span></li>
+<li><a href="https://www.wsfcs.k12.nc.us/article/2665802">Winston-Salem/Forsyth County Schools ↗</a><span>The January 2026 district announcement limits secondary students to selected AI platforms meeting district safety, data privacy, and appropriate-use requirements. This is conditional access, not a blanket ban.</span></li>
+<li><a href="https://files-backend.assets.thrillshare.com/documents/asset/uploaded_file/4467/Scs/7b28ad67-8687-4be1-8dfa-ecdb52390710/3221_9-22-25.pdf?disposition=inline">Stokes County Schools ↗</a><span>Policy 3221 directs students and staff never to enter their own or others' personal information into generative AI and requires checking tool compliance with technology staff.</span></li>
+<li><a href="https://campussuite-storage.s3.amazonaws.com/prod/1559039/252d940a-b7a2-11ea-a606-121cb31c8405/2960156/3e2720ee-3b0e-11f0-8419-0a58a9feac02/file/AI%20Guidelines%20Staff.pdf">McDowell County Schools ↗</a><span>Staff AI guidance directs educators to avoid entering PII or confidential information, including student and staff information, into AI systems.</span></li>
+<li><a href="https://resources.finalsite.net/images/v1754337961/pamlicoschoolsorg/zzh4sddber8dwjrjxmjk/PamlicoCountySchoolsGenerativeAIStudentGuidlines211.pdf">Pamlico County Schools ↗</a><span>District AI literacy guidance directs users to avoid PII or confidential information in AI systems, including contact details, demographics, and rosters.</span></li>
+<li><a href="https://www.nhcs.net/divisions/instruction-and-academic-accountability/curriculum-instruction/nhcs-gen-ai">New Hanover County Schools ↗</a><span>District guidance prohibits confidential information and PII in generative AI, prohibits unapproved wearable/ambient AI, and disallows agentic AI on district-connected accounts because of student-data concerns.</span></li>
+<li><a href="https://sites.google.com/wcpss.net/library-media-services/wakemedia-monthly/may-2026">Wake County Public School System ↗</a><span>The district's Library Media Services May 2026 guidance says entering PII into AI tools is not recommended. Counted as an official privacy recommendation, not a binding prohibition.</span></li>
+<li><a href="https://www.asheschools.org/parentsstudents/student-programs-and-policies/ai-dashboard">Ashe County Schools ↗</a><span>District guidance limits AI feedback submissions to work without personally identifiable information. Its published AI dashboard also reproduces state guidance against entering PII.</span></li>
+<li><a href="https://www.cabarrus.k12.nc.us/105238_3">Cabarrus County Schools ↗</a><span>District AI guidelines tell students not to enter personal information into AI platforms and prohibit violating privacy by entering personal or sensitive data. Approved tools and assignment-specific permission are also required.</span></li>
+<li><a href="https://files-backend.assets.thrillshare.com/documents/asset/uploaded_file/3653/Ccs/5555f982-23c4-4f73-8519-4f1bd26bdbb4/25-26_CCS_Student_Handbook___Code_of_Conduct_w.pdf?disposition=inline">Camden County Schools ↗</a><span>The 2025–26 handbook’s AI guidelines, printed page 69, advise avoiding sensitive data such as student IDs, grades, signatures and account credentials in AI tools. Users must review data practices and consult district technology staff when security is uncertain.</span></li>
+<li><a href="https://sites.google.com/gcs.k12.nc.us/gcps-ai-dashboard/faq">Granville County Public Schools ↗</a><span>The district’s AI FAQ says tools collecting unnecessary personal information are not allowed. AI tools undergo data-privacy, bias and educational-value review before approval, alongside district privacy requirements.</span></li>
+<li><a href="https://www.greensboroday.org/academics/artificial-intelligence-at-gds/ai-safety-data-privacy">Greensboro Day School ↗</a><span>School AI guidance permits only vetted services, requires data minimization and prohibits sharing PII under its responsible-use policy. It identifies a limited allowance for necessary student names in approved tools using school accounts.</span></li>
+<li><a href="https://www.da.org/about/newsroom/magazine/news-post-da/~board/news/post/da-unveils-generative-ai-framework-for-faculty-and-staff">Durham Academy ↗</a><span>Its published faculty/staff AI framework marks sensitive-data handling and surveillance as high-risk “Red Light” uses to avoid. Counted as official risk guidance, not a blanket AI ban.</span></li></ul>
+<h3>Higher education · 27</h3><ul><li><a href="https://ai.ncsu.edu/ai-tools/">NC State University ↗</a><span>Sensitive-data use depends on approved tools; other uses of Red or Purple data require an IT purchase compliance review.</span></li>
+<li><a href="https://hub.ncat.edu/administration/its/ai/ai-data-governance.php">North Carolina A&amp;T State University ↗</a><span>Confidential data is prohibited in generative AI; sensitive data requires approved tools, department authorization, and anonymization where possible.</span></li>
+<li><a href="https://oarc.duke.edu/our-focus-areas/privacy/data-governance-and-protection-duke/">Duke University ↗</a><span>Only public-classified data may be submitted to public AI tools. This university source excludes Duke University Health System.</span></li>
+<li><a href="https://www.cpcc.edu/policies-and-procedures/policies/209-use-of-college-information-technologies">Central Piedmont Community College ↗</a><span>Restricted or sensitive information cannot enter public or unapproved AI tools. Sensitive-data use in approved platforms still requires applicable IT approval.</span></li>
+<li><a href="https://ai.appstate.edu/guidance/data-security">Appalachian State University ↗</a><span>Guidance bars sensitive or confidential information from AI chat interfaces not approved for that data and restricts unauthorized tools.</span></li>
+<li><a href="https://oneit.charlotte.edu/innovation/artificial-intelligence/security-checklist/">UNC Charlotte ↗</a><span>The security checklist directs users not to enter confidential, legally restricted, or Level 3 university data into AI tools.</span></li>
+<li><a href="https://ai.uncg.edu/governance/permissible-use-cases/">UNC Greensboro ↗</a><span>Sensitive and nonpublic data require the stated exceptions or written review and approval; unapproved AI tools must not receive protected information.</span></li>
+<li><a href="https://ai.ecu.edu/using-generative-ai-at-ecu/">East Carolina University ↗</a><span>Protected institutional data requires approved tools or locally operated tools on ECU-managed devices; ChatGPT research use requires case-specific approval.</span></li>
+<li><a href="https://www.uncw.edu/research/projects/ai-hub/responsible-ai-use">UNC Wilmington ↗</a><span>Responsible-use guidance directs users to avoid entering sensitive or regulated university data into publicly available AI tools.</span></li>
+<li><a href="https://www.wcu.edu/learn/academic-services/it/ai/student-guide.aspx">Western Carolina University ↗</a><span>The student guide describes limits on sensitive and FERPA-protected information in AI systems and use of university-approved tools with privacy protections.</span></li>
+<li><a href="https://www.wssu.edu/academics/ai-at-wssu/ai-policy-guidelines.html">Winston-Salem State University ↗</a><span>Published guidance says never to enter confidential, sensitive, or FERPA-protected information into AI tools while broader institutional guidelines are being developed.</span></li>
+<li><a href="https://services.uncfsu.edu/TDClient/30/Portal/Requests/Service/152/Microsoft-Copilot-Chat">Fayetteville State University ↗</a><span>Copilot Chat approval covers only data tiers 0 and 1; confidential and restricted data are not approved.</span></li>
+<li><a href="https://uncp.edu/about/administration/policies-procedures-reports/pol-08-00-01-electronic-information-management-and-security-policy.html">UNC Pembroke ↗</a><span>Section 4.6 prohibits university protected or sensitive data in public AI without express authorization and requires appropriate risk assessment.</span></li>
+<li><a href="https://www.waketech.edu/catalog/campus-policies-and-procedures">Wake Technical Community College ↗</a><span>College policy requires written CIO consent before confidential institutional or FERPA-protected student data is submitted to, ingested by, or used to train generative AI.</span></li>
+<li><a href="https://www.durhamtech.edu/policies-and-procedures/academic-integrity">Durham Technical Community College ↗</a><span>The AI section directs both employees and students to avoid putting personal, confidential, or sensitive data into public AI tools.</span></li>
+<li><a href="https://www.elon.edu/u/fa/technology/artificial-intelligence/">Elon University ↗</a><span>AI data-security guidance requires the data owner's permission before confidential information or sensitive university data is shared.</span></li>
+<li><a href="https://ai.wfu.edu/commercial-data-protection/">Wake Forest University ↗</a><span>Guidance directs users to approved tools for university data and prohibits pasting sensitive student, personal, medical, or research data into free or personal AI accounts.</span></li>
+<li><a href="https://www.davidson.edu/offices-and-services/technology-innovation/it-guidelines-policies/artificial-intelligence-policy">Davidson College ↗</a><span>Internal and restricted data require college-provided platforms; confidential data requires Information Security review. The policy was last reviewed in March 2026.</span></li>
+<li><a href="https://nccu.teamdynamix.com/TDClient/1852/Portal/KB/Article/171201/AI-Use-at-NCCU">North Carolina Central University ↗</a><span>ITS guidance prohibits confidential and highly restricted data in AI tools, requires approved tools for university work, and bars personal AI accounts from processing university data.</span></li>
+<li><a href="https://ai.unc.edu/staff-generative-ai-usage-guidance/">University of North Carolina at Chapel Hill ↗</a><span>Staff guidance requires Information Security risk assessment and Data Governance Oversight Group approval before sensitive information may enter a generative AI tool.</span></li>
+<li><a href="https://myapps.northcarolina.edu/it/amplify/">UNC System Office ↗</a><span>The System Office's Amplify rules prohibit protected identifiers, financial account information, and HIPAA-, GLBA-, and CJIS-protected data. Counts the administrative office only, separately from universities.</span></li>
+<li><a href="https://www.alamancecc.edu/guide-to-ai-use.php">Alamance Community College ↗</a><span>Its academic AI guide directs students and faculty never to enter confidential or personal data into AI tools.</span></li>
+<li><a href="https://www.beaufortccc.edu/wp-content/uploads/2025/06/6-28_Generative-Artificial-Intelligence-AI-Use-Policy.pdf">Beaufort County Community College ↗</a><span>Policy 6.28 prohibits staff and faculty from processing sensitive college data in unauthorized AI/cloud services and prohibits AI recording of meetings.</span></li>
+<li><a href="https://reference.carteret.edu/artificial-intelligence-ai-policy">Carteret Community College ↗</a><span>Policy 5.19, approved May 2026, bars confidential, regulated, proprietary, or otherwise protected data from public AI tools.</span></li>
+<li><a href="https://libguides.rccc.edu/AI/home">Rowan-Cabarrus Community College ↗</a><span>The college library's AI safety guidance directs users not to share personal, confidential, or sensitive information with AI. This is published guidance, not a campus-wide AI ban.</span></li>
+<li><a href="https://abtech.edu/program-finder/academic/radiography/radiography-program-student-handbook/radiography-program-clinical-procedures">Asheville-Buncombe Technical Community College ↗</a><span>Radiography clinical procedures prohibit AI-enabled or recording-capable wearables in clinical and confidential areas because of PHI capture risks. This is a program/device restriction; Cloak does not address wearable recording.</span></li>
+<li><a href="https://assets.campbell.edu/wp-content/uploads/sites/22/2025/07/DO_Academic_Bulletin_2025-2026.pdf">Campbell University ↗</a><span>The School of Osteopathic Medicine's published 2025–26 bulletin permits course-content uploads only to Campbell-authenticated Copilot, citing intellectual property and data privacy. It prohibits those uploads to open AI systems; scope is that school.</span></li></ul>
+<h3>Healthcare · 2</h3><ul><li><a href="https://atriumhealth.org/-/media/wakeforest/clinical/files/about-us/codeofconductadvocatehealthenterprise91225">Advocate Health (including Atrium Health) ↗</a><span>The enterprise Code of Conduct prohibits unapproved generative AI tools from interacting with confidential or restricted data. Counted once for the parent organization, including its NC Atrium Health operations; not once per hospital.</span></li>
+<li><a href="https://www.labcorp.com/content/dam/labcorp/files/compliance/2147953_EnterpriseCodeofConduct%202026_FINAL.pdf">Labcorp ↗</a><span>February 2026 Code of Conduct, page 18: employees may use only AI tools vetted for privacy, security, and protection of sensitive and personal information. Burlington-headquartered company; no global employee count is added.</span></li></ul>
+<h3>Population subtotal · 14 universities</h3>
 <p>267,382 student enrollments across 14 cited universities. Fall 2025 enrollment subtotal for 14 explicitly sourced universities only. Not the number blocked from AI, unique NC residents, actual Cloak users, or a deduplicated population. Excludes employees and all organizations without a selected enrollment figure. The UNC System figures are preliminary; all selected counts refer to fall 2025.</p>
-<p>NC State University: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">39,259</a> Â· North Carolina A&amp;T State University: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">15,275</a> Â· Duke University: <a href="https://facts.duke.edu/">17,325</a> Â· Appalachian State University: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">21,798</a> Â· UNC Charlotte: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">32,207</a> Â· UNC Greensboro: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">18,682</a> Â· East Carolina University: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">27,153</a> Â· UNC Wilmington: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">19,895</a> Â· Western Carolina University: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">11,845</a> Â· Winston-Salem State University: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">4,972</a> Â· Fayetteville State University: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">7,623</a> Â· UNC Pembroke: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">8,089</a> Â· North Carolina Central University: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">9,160</a> Â· University of North Carolina at Chapel Hill: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">34,099</a>.</p>
-<h3>If everyone used Cloak</h3><p>If every student represented by the 267,382 enrollments used ChatGPT with Cloak: 267,382 Ã— 4.28 prompts/day Ã— 8.5% = approximately 97,274 sensitive prompts per day, or 35,504,854 per year at the same daily rate. An illustrative full-use scenario, not observed adoption or measured prevention. It treats each enrollment as one user, assumes institutionally permitted use, and holds both study rates constant. The population is not deduplicated. Cloak can reduce exposure of identifiers it detects; the share of these sensitive messages it could fully protect has not been measured. This is not a compliance guarantee.</p>
-<p>Epoch AI reports 4.28 prompts per calendar day among weekly active panelists in July 2025, from a selected US YouGov panel of 5,000 people who used ChatGPT in 2026. Harmonic found sensitive information in 8.5% of tens of thousands of business prompts across five AI tools in Q4 2024. Its nearly-one-in-ten finding covers customer, employee, legal/financial, security and code data, not PII alone. Combining these different populations gives a scenario, not a measured NC student rate. Annual volume uses 365 days and is rounded only after multiplication. No byte-size or detection-success assumption is made. <a href="https://epoch.ai/data/chatgpt-usage-documentation/methodology">Epoch AI: prompt frequency â†—</a> Â· <a href="https://www.harmonic.security/resources/new-research-the-data-leaking-into-genai-tools">Harmonic: sensitive prompt study â†—</a></p>
-<p>No count is assigned to unnamed organizations, academic-integrity-only bans, or historical media reports without sufficiently current qualifying evidence. Recommendations and limited-scope rules are identified explicitly. Inclusion does not imply Cloak can satisfy or remove a rule: approved-tool, clinical-device, and other requirements remain applicable. Listed organizations are not represented as Cloak customers, partners, endorsers, or adopters. <a href="https://www.truist.com/who-we-are/about-truist">Truist confirms its Charlotte headquarters.</a> <a href="assets/nc-restrictions.json">Download the source register â†—</a></p></details>
+<p>NC State University: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">39,259</a> · North Carolina A&amp;T State University: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">15,275</a> · Duke University: <a href="https://facts.duke.edu/">17,325</a> · Appalachian State University: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">21,798</a> · UNC Charlotte: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">32,207</a> · UNC Greensboro: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">18,682</a> · East Carolina University: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">27,153</a> · UNC Wilmington: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">19,895</a> · Western Carolina University: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">11,845</a> · Winston-Salem State University: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">4,972</a> · Fayetteville State University: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">7,623</a> · UNC Pembroke: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">8,089</a> · North Carolina Central University: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">9,160</a> · University of North Carolina at Chapel Hill: <a href="https://www.northcarolina.edu/wp-content/uploads/unc-system-images/news/sept-2025_enrollment.pdf">34,099</a>.</p>
+<h3>If everyone used Cloak</h3><p>If every student represented by the 267,382 enrollments used ChatGPT with Cloak: 267,382 × 4.28 prompts/day × 8.5% = approximately 97,274 sensitive prompts per day, or 35,504,854 per year at the same daily rate. An illustrative full-use scenario, not observed adoption or measured prevention. It treats each enrollment as one user, assumes institutionally permitted use, and holds both study rates constant. The population is not deduplicated. Cloak can reduce exposure of identifiers it detects; the share of these sensitive messages it could fully protect has not been measured. This is not a compliance guarantee.</p>
+<p>Epoch AI reports 4.28 prompts per calendar day among weekly active panelists in July 2025, from a selected US YouGov panel of 5,000 people who used ChatGPT in 2026. Harmonic found sensitive information in 8.5% of tens of thousands of business prompts across five AI tools in Q4 2024. Its nearly-one-in-ten finding covers customer, employee, legal/financial, security and code data, not PII alone. Combining these different populations gives a scenario, not a measured NC student rate. Annual volume uses 365 days and is rounded only after multiplication. No byte-size or detection-success assumption is made. <a href="https://epoch.ai/data/chatgpt-usage-documentation/methodology">Epoch AI: prompt frequency ↗</a> · <a href="https://www.harmonic.security/resources/new-research-the-data-leaking-into-genai-tools">Harmonic: sensitive prompt study ↗</a></p>
+<p>No count is assigned to unnamed organizations, academic-integrity-only bans, or historical media reports without sufficiently current qualifying evidence. Recommendations and limited-scope rules are identified explicitly. Inclusion does not imply Cloak can satisfy or remove a rule: approved-tool, clinical-device, and other requirements remain applicable. Listed organizations are not represented as Cloak customers, partners, endorsers, or adopters. <a href="https://www.truist.com/who-we-are/about-truist">Truist confirms its Charlotte headquarters.</a> <a href="assets/nc-restrictions.json">Download the source register ↗</a></p></details>
     </section>
     <section id="lab" class="lab-section">
       <div class="wrap">
-        <div class="section-heading"><div><p class="eyebrow"><span class="status-dot"></span> 02 â€” A HOSPITAL WORKFLOW</p><h2>The task stays.<br><em>The identifiers change.</em></h2></div><div><p>A fictional patient history. A real ChatGPT conversation. Follow the original prompt into DevTools, then see the returned tokens become readable details again.</p><p class="local-note">REAL CHROME CAPTURES Â· FICTIONAL PATIENT DATA</p></div></div>
+        <div class="section-heading"><div><p class="eyebrow"><span class="status-dot"></span> 02 — A HOSPITAL WORKFLOW</p><h2>The task stays.<br><em>The identifiers change.</em></h2></div><div><p>A fictional patient history. A real ChatGPT conversation. Follow the original prompt into DevTools, then see the returned tokens become readable details again.</p><p class="local-note">REAL CHROME CAPTURES · FICTIONAL PATIENT DATA</p></div></div>
 <div class="medical-gallery">
  <div class="medical-tabs" role="tablist" aria-label="ChatGPT screenshots">
  <button id="medical-tab-original" role="tab" aria-controls="medical-panel" aria-selected="true" data-medical="original"><span>01</span>Before sending</button>
  <button id="medical-tab-payload" role="tab" aria-controls="medical-panel" aria-selected="false" tabindex="-1" data-medical="payload"><span>02</span>Masked request</button>
  <button id="medical-tab-response" role="tab" aria-controls="medical-panel" aria-selected="false" tabindex="-1" data-medical="response"><span>03</span>Raw response</button>
  <button id="medical-tab-restored" role="tab" aria-controls="medical-panel" aria-selected="false" tabindex="-1" data-medical="restored"><span>04</span>Restored UI</button></div>
- <figure id="medical-panel" role="tabpanel" aria-labelledby="medical-tab-original" tabindex="0"><a id="medical-full" href="assets/medical-capture/01-original.png" target="_blank" rel="noopener" aria-label="Open full original screenshot"><div class="medical-viewport"><img id="medical-image" src="assets/medical-capture/01-original.png" width="1920" height="1032" loading="lazy" alt="Real ChatGPT composer containing the fictional patientâ€™s name, email, phone, address, medical history, and request for analysis before sending."></div></a><figcaption><div><strong id="medical-caption-title">The original prompt, before sending.</strong><p id="medical-caption">Personal identifiers and medical context are visible in ChatGPTâ€™s composer. All patient details in this demonstration are fictional.</p></div><a id="medical-open" href="assets/medical-capture/01-original.png" target="_blank" rel="noopener">Full screenshot â†—</a></figcaption></figure>
- <p class="capture-note">Captured in Chrome on October 25, 2026. Three unaltered screenshots document four stages; the restored view focuses the left pane of the response capture. This is a privacy demonstration, not clinical guidance. <a href="#healthcare-scope">Healthcare scope â†—</a></p>
+ <figure id="medical-panel" role="tabpanel" aria-labelledby="medical-tab-original" tabindex="0"><a id="medical-full" href="assets/medical-capture/01-original.png" target="_blank" rel="noopener" aria-label="Open full original screenshot"><div class="medical-viewport"><img id="medical-image" src="assets/medical-capture/01-original.png" width="1920" height="1032" loading="lazy" alt="Real ChatGPT composer containing the fictional patient’s name, email, phone, address, medical history, and request for analysis before sending."></div></a><figcaption><div><strong id="medical-caption-title">The original prompt, before sending.</strong><p id="medical-caption">Personal identifiers and medical context are visible in ChatGPT’s composer. All patient details in this demonstration are fictional.</p></div><a id="medical-open" href="assets/medical-capture/01-original.png" target="_blank" rel="noopener">Full screenshot ↗</a></figcaption></figure>
+ <p class="capture-note">Captured in Chrome on October 25, 2026. Three unaltered screenshots document four stages; the restored view focuses the left pane of the response capture. This is a privacy demonstration, not clinical guidance. <a href="#healthcare-scope">Healthcare scope ↗</a></p>
  </div>
  <details class="interactive-disclosure"><summary>Mask your own example <span aria-hidden="true">+</span></summary>
         <div class="lab-shell">
@@ -238,45 +279,93 @@ Address: 123 Main Street, Raleigh, NC 27601
 
 Medical history: 52-year-old with type 2 diabetes and hypertension. Takes metformin and lisinopril. Reports fatigue; recent HbA1c is 8.2%.
 
-Analyze this history in three brief bullets: key patterns, missing information, and questions for clinician review. Do not recommend treatment. Begin with the patient name and email exactly as provided.</textarea><div class="input-footer"><span id="char-count">0 / 6,000</span><button id="clear" class="quiet-button">Clear text</button></div><details class="demo-settings"><summary>Adjust masking settings <span aria-hidden="true">+</span></summary><fieldset class="coverage"><legend>CHOOSE WHAT CLOAK CHECKS</legend><label><input type="checkbox" value="names" checked>Names</label><label><input type="checkbox" value="emails" checked>Emails</label><label><input type="checkbox" value="phones" checked>Phones</label><label><input type="checkbox" value="addresses" checked>Addresses</label></fieldset><label class="custom-label" for="custom-term">CUSTOM TERM <span>Optional Â· one exact term</span></label><input id="custom-term" maxlength="120" placeholder="e.g. Project Firefly" autocomplete="off" spellcheck="false"></details></div>
-            <div class="output-pane"><div class="pane-heading"><span>The masked payload</span><span class="masked-count" id="masked-count">Loading engineâ€¦</span></div><div class="output-tabs" role="tablist" aria-label="Inspect the result"><button id="tab-masked" role="tab" aria-selected="true" aria-controls="result-panel" data-view="masked">Masked prompt</button><button id="tab-restored" role="tab" aria-selected="false" aria-controls="result-panel" tabindex="-1" data-view="restored">Restored text</button><button id="tab-vault" role="tab" aria-selected="false" aria-controls="result-panel" tabindex="-1" data-view="vault">Demo vault</button></div><div id="result-panel" role="tabpanel" aria-labelledby="tab-masked" tabindex="0"><pre id="result"></pre><div id="vault-rows" hidden></div></div><div class="result-bottom"><span id="round-trip" role="status" aria-live="polite">Preparing local previewâ€¦</span><span>ON DEVICE</span></div><p id="view-explanation">These tokens replace the detected details in a supported outgoing request.</p></div>
+Analyze this history in three brief bullets: key patterns, missing information, and questions for clinician review. Do not recommend treatment. Begin with the patient name and email exactly as provided.</textarea><div class="input-footer"><span id="char-count">0 / 6,000</span><button id="clear" class="quiet-button">Clear text</button></div><details class="demo-settings"><summary>Adjust masking settings <span aria-hidden="true">+</span></summary><fieldset class="coverage"><legend>CHOOSE WHAT CLOAK CHECKS</legend><label><input type="checkbox" value="names" checked>Names</label><label><input type="checkbox" value="emails" checked>Emails</label><label><input type="checkbox" value="phones" checked>Phones</label><label><input type="checkbox" value="addresses" checked>Addresses</label></fieldset><label class="custom-label" for="custom-term">CUSTOM TERM <span>Optional · one exact term</span></label><input id="custom-term" maxlength="120" placeholder="e.g. Project Firefly" autocomplete="off" spellcheck="false"></details></div>
+            <div class="output-pane"><div class="pane-heading"><span>The masked payload</span><span class="masked-count" id="masked-count">Loading engine…</span></div><div class="output-tabs" role="tablist" aria-label="Inspect the result"><button id="tab-masked" role="tab" aria-selected="true" aria-controls="result-panel" data-view="masked">Masked prompt</button><button id="tab-restored" role="tab" aria-selected="false" aria-controls="result-panel" tabindex="-1" data-view="restored">Restored text</button><button id="tab-vault" role="tab" aria-selected="false" aria-controls="result-panel" tabindex="-1" data-view="vault">Demo vault</button></div><div id="result-panel" role="tabpanel" aria-labelledby="tab-masked" tabindex="0"><pre id="result"></pre><div id="vault-rows" hidden></div></div><div class="result-bottom"><span id="round-trip" role="status" aria-live="polite">Preparing local preview…</span><span>ON DEVICE</span></div><p id="view-explanation">These tokens replace the detected details in a supported outgoing request.</p></div>
           </div>
-          <div class="lab-footnote" id="demo-note"><span>â†³</span><p>Fictional data only. This shows identifier masking, not HIPAA-compliant de-identification. <a href="#healthcare-scope">Healthcare scope â†—</a></p></div>
+          <div class="lab-footnote" id="demo-note"><span>↳</span><p>Fictional data only. This shows identifier masking, not HIPAA-compliant de-identification. <a href="#healthcare-scope">Healthcare scope ↗</a></p></div>
         </div>
         </details><noscript><p class="noscript-note">Enable JavaScript to try the local masking demo. All project information remains available below.</p></noscript>
       </div>
     </section>
 
-    <section id="interface" class="interface-section wrap"><div class="interface-shell"><div class="interface-copy"><p class="eyebrow">03 â€” THE CLOAK EXPERIENCE</p><h2>Your privacy.<br><em>Your controls.</em></h2><p>Check protection. Inspect local mappings. Choose what gets masked. The actual Cloak interface, below.</p><div class="screen-tabs" role="tablist" aria-label="Extension screenshots">
-<button id="screen-tab-home" role="tab" aria-selected="true" aria-controls="screen-home" data-screen="home"><span>01</span><span><strong>Home</strong><small>Protection status and local activity.</small></span><span aria-hidden="true">â†—</span></button>
-<button id="screen-tab-try" role="tab" aria-selected="false" aria-controls="screen-try" tabindex="-1" data-screen="try"><span>02</span><span><strong>Try it</strong><small>Inspect a prompt before you send.</small></span><span aria-hidden="true">â†—</span></button>
-<button id="screen-tab-vault" role="tab" aria-selected="false" aria-controls="screen-vault" tabindex="-1" data-screen="vault"><span>03</span><span><strong>Vault</strong><small>Search, reveal, export, and clear.</small></span><span aria-hidden="true">â†—</span></button>
-<button id="screen-tab-coverage" role="tab" aria-selected="false" aria-controls="screen-coverage" tabindex="-1" data-screen="coverage"><span>04</span><span><strong>Coverage</strong><small>Choose which categories to protect.</small></span><span aria-hidden="true">â†—</span></button></div></div><div class="screen-stage">
-<figure id="screen-home" role="tabpanel" aria-labelledby="screen-tab-home" data-screen-panel="home" tabindex="0"><img src="assets/screenshots/home.png" width="760" height="1120" loading="lazy" alt="Cloak Home: protection on for ChatGPT, with local activity counters and six navigation controls."><figcaption>Actual Cloak interface Â· Sample activity data</figcaption></figure>
-<figure id="screen-try" role="tabpanel" aria-labelledby="screen-tab-try" data-screen-panel="try" tabindex="0" hidden><img src="assets/screenshots/try.png" width="760" height="1120" loading="lazy" alt="Cloak Try it: a fictional name, email, and phone transformed into three tokens, with a successful restore check."><figcaption>Actual Cloak interface Â· Fictional example prompt</figcaption></figure>
-<figure id="screen-vault" role="tabpanel" aria-labelledby="screen-tab-vault" data-screen-panel="vault" tabindex="0" hidden><img src="assets/screenshots/vault.png" width="760" height="1120" loading="lazy" alt="Cloak Vault: four sample token mappings with hidden values, individual Reveal buttons, search, export, and clear controls."><figcaption>Actual Cloak interface Â· Fictional vault entries</figcaption></figure>
-<figure id="screen-coverage" role="tabpanel" aria-labelledby="screen-tab-coverage" data-screen-panel="coverage" tabindex="0" hidden><img src="assets/screenshots/coverage.png" width="760" height="1120" loading="lazy" alt="Cloak Coverage: names, email addresses, phone numbers, and street addresses enabled with individual switches."><figcaption>Actual Cloak interface Â· Four category controls</figcaption></figure>
+    <section id="interface" class="interface-section wrap"><div class="interface-shell"><div class="interface-copy"><p class="eyebrow">03 — THE CLOAK EXPERIENCE</p><h2>Your privacy.<br><em>Your controls.</em></h2><p>Check protection. Inspect local mappings. Choose what gets masked. The actual Cloak interface, below.</p><div class="screen-tabs" role="tablist" aria-label="Extension screenshots">
+<button id="screen-tab-home" role="tab" aria-selected="true" aria-controls="screen-home" data-screen="home"><span>01</span><span><strong>Home</strong><small>Protection status and local activity.</small></span><span aria-hidden="true">↗</span></button>
+<button id="screen-tab-try" role="tab" aria-selected="false" aria-controls="screen-try" tabindex="-1" data-screen="try"><span>02</span><span><strong>Try it</strong><small>Inspect a prompt before you send.</small></span><span aria-hidden="true">↗</span></button>
+<button id="screen-tab-vault" role="tab" aria-selected="false" aria-controls="screen-vault" tabindex="-1" data-screen="vault"><span>03</span><span><strong>Vault</strong><small>Search, reveal, export, and clear.</small></span><span aria-hidden="true">↗</span></button>
+<button id="screen-tab-coverage" role="tab" aria-selected="false" aria-controls="screen-coverage" tabindex="-1" data-screen="coverage"><span>04</span><span><strong>Coverage</strong><small>Choose which categories to protect.</small></span><span aria-hidden="true">↗</span></button></div></div><div class="screen-stage">
+<figure id="screen-home" role="tabpanel" aria-labelledby="screen-tab-home" data-screen-panel="home" tabindex="0"><img src="assets/screenshots/home.png" width="760" height="1120" loading="lazy" alt="Cloak Home: protection on for ChatGPT, with local activity counters and six navigation controls."><figcaption>Actual Cloak interface · Sample activity data</figcaption></figure>
+<figure id="screen-try" role="tabpanel" aria-labelledby="screen-tab-try" data-screen-panel="try" tabindex="0" hidden><img src="assets/screenshots/try.png" width="760" height="1120" loading="lazy" alt="Cloak Try it: a fictional name, email, and phone transformed into three tokens, with a successful restore check."><figcaption>Actual Cloak interface · Fictional example prompt</figcaption></figure>
+<figure id="screen-vault" role="tabpanel" aria-labelledby="screen-tab-vault" data-screen-panel="vault" tabindex="0" hidden><img src="assets/screenshots/vault.png" width="760" height="1120" loading="lazy" alt="Cloak Vault: four sample token mappings with hidden values, individual Reveal buttons, search, export, and clear controls."><figcaption>Actual Cloak interface · Fictional vault entries</figcaption></figure>
+<figure id="screen-coverage" role="tabpanel" aria-labelledby="screen-tab-coverage" data-screen-panel="coverage" tabindex="0" hidden><img src="assets/screenshots/coverage.png" width="760" height="1120" loading="lazy" alt="Cloak Coverage: names, email addresses, phone numbers, and street addresses enabled with individual switches."><figcaption>Actual Cloak interface · Four category controls</figcaption></figure>
 </div></div></section>
 
     <section id="project" class="project-section"><div class="wrap">
-      <div class="section-heading"><div><p class="eyebrow">04 â€” UNDER THE HOOD</p><h2>Built for a reply<br><em>that keeps flowing.</em></h2></div><p>The hard part is the return trip. A token can be split across response chunks. Cloak holds incomplete fragments until it can restore them without breaking the reply.</p></div>
-      <details class="engineering-disclosure"><summary><span><strong>Inside the engine</strong><small>Streaming demo Â· Design decisions Â· Source code</small></span><span class="disclosure-action">Explore <b aria-hidden="true">+</b></span></summary><div class="engineering-content"><div class="engineering-grid">
-        <div class="stream-workbench"><div class="workbench-heading"><span class="lab-title"><span class="status-dot"></span> STREAM RESTORATION</span><a href="https://github.com/L-Logix/cloak/blob/unreleased/intercept.js">View engine source â†—</a></div>
-          <div class="stream-controls"><label for="chunk-size">Incoming chunk size <output id="chunk-value" for="chunk-size">6 bytes</output></label><input id="chunk-size" type="range" min="1" max="16" value="6"><button class="button primary" id="run-stream">Run stream test <span aria-hidden="true">â†’</span></button></div>
-          <p class="workbench-label">INCOMING CHUNKS Â· SYNTHETIC REPLY</p><div id="stream-chunks" class="stream-chunks" aria-label="Incoming response chunks"></div>
-          <p class="workbench-label">CLOAK RESTORES</p><p id="stream-output" class="stream-output"></p><p id="stream-status" class="stream-status" role="status" aria-live="polite">Preparing the local streamâ€¦</p>
+      <div class="section-heading"><div><p class="eyebrow">04 — UNDER THE HOOD</p><h2>Built for a reply<br><em>that keeps flowing.</em></h2></div><p>The hard part is the return trip. A token can be split across response chunks. Cloak holds incomplete fragments until it can restore them without breaking the reply.</p></div>
+      <details class="engineering-disclosure"><summary><span><strong>Inside the engine</strong><small>Streaming demo · Design decisions · Source code</small></span><span class="disclosure-action">Explore <b aria-hidden="true">+</b></span></summary><div class="engineering-content"><div class="engineering-grid">
+        <div class="stream-workbench"><div class="workbench-heading"><span class="lab-title"><span class="status-dot"></span> STREAM RESTORATION</span><a href="https://github.com/L-Logix/cloak/blob/unreleased/intercept.js">View engine source ↗</a></div>
+          <div class="stream-controls"><label for="chunk-size">Incoming chunk size <output id="chunk-value" for="chunk-size">6 bytes</output></label><input id="chunk-size" type="range" min="1" max="16" value="6"><button class="button primary" id="run-stream">Run stream test <span aria-hidden="true">→</span></button></div>
+          <p class="workbench-label">INCOMING CHUNKS · SYNTHETIC REPLY</p><div id="stream-chunks" class="stream-chunks" aria-label="Incoming response chunks"></div>
+          <p class="workbench-label">CLOAK RESTORES</p><p id="stream-output" class="stream-output"></p><p id="stream-status" class="stream-status" role="status" aria-live="polite">Preparing the local stream…</p>
         </div>
-        <div class="engineering-notes"><article><span>01 / MANIFEST V3</span><h3>Bridge Chromeâ€™s two worlds.</h3><p>A bundle in the pageâ€™s main context wraps fetch and XHR. A postMessage bridge connects it to the isolated extension script and local vault.</p></article><article><span>02 / PAYLOAD PARSING</span><h3>Preserve the request structure.</h3><p>The rewriteBody pipeline finds text inside structured payloads and rebuilds the request after masking. Gemini protobuf parsing remains experimental.</p></article><article><span>03 / LOCAL DETECTION</span><h3>Tokenize inside the browser.</h3><p>Compromise NLP, address parsing, regular expressions, and custom terms identify values locally. Reversible tokens connect the outgoing prompt to the returning reply.</p></article></div>
+        <div class="engineering-notes"><article><span>01 / MANIFEST V3</span><h3>Bridge Chrome’s two worlds.</h3><p>A bundle in the page’s main context wraps fetch and XHR. A postMessage bridge connects it to the isolated extension script and local vault.</p></article><article><span>02 / PAYLOAD PARSING</span><h3>Preserve the request structure.</h3><p>The rewriteBody pipeline finds text inside structured payloads and rebuilds the request after masking. Gemini protobuf parsing remains experimental.</p></article><article><span>03 / LOCAL DETECTION</span><h3>Tokenize inside the browser.</h3><p>Compromise NLP, address parsing, regular expressions, and custom terms identify values locally. Reversible tokens connect the outgoing prompt to the returning reply.</p></article></div>
       </div>
       <p class="technical-results">For a closer look: <a href="assets/test-report.json">49 passing tests</a> and <a href="assets/synthetic-benchmark.json">1,024 generated prompts restored exactly</a>. Saved results from sample inputs; not a real-world accuracy measure.</p>
-      <details class="source-map"><summary>Explore the source code <span aria-hidden="true">+</span></summary><div><a href="https://github.com/L-Logix/cloak/blob/unreleased/intercept.js"><strong>intercept.js</strong><span>Main-world interception â†’ rewriteBody â†’ restoreStream</span></a><a href="https://github.com/L-Logix/cloak/blob/unreleased/content.js"><strong>content.js</strong><span>Extension storage bridge, status badge, media notice</span></a><a href="https://github.com/L-Logix/cloak/blob/unreleased/popup.js"><strong>popup.js</strong><span>Coverage, custom terms, searchable vault, local activity</span></a></div></details>
+      <details class="source-map"><summary>Explore the source code <span aria-hidden="true">+</span></summary><div><a href="https://github.com/L-Logix/cloak/blob/unreleased/intercept.js"><strong>intercept.js</strong><span>Main-world interception → rewriteBody → restoreStream</span></a><a href="https://github.com/L-Logix/cloak/blob/unreleased/content.js"><strong>content.js</strong><span>Extension storage bridge, status badge, media notice</span></a><a href="https://github.com/L-Logix/cloak/blob/unreleased/popup.js"><strong>popup.js</strong><span>Coverage, custom terms, searchable vault, local activity</span></a></div></details>
     </div></details></div></section>
 
-<section id="compatibility" class="wrap compatibility-section"><p class="eyebrow">PLATFORM SUPPORT</p><h2>Platform Compatibility &amp; Current Status</h2><p>ChatGPT is the only supported platform in this release.</p><div class="compatibility-table"><table><caption>Compatibility Matrix</caption><thead><tr><th scope="col">Platform</th><th scope="col">Status</th><th scope="col">Current implementation</th></tr></thead><tbody><tr><th scope="row">ChatGPT</th><td><span class="status-chip status-supported"><span aria-hidden="true"></span>Stable Â· supported</span></td><td>Outgoing interception and incoming stream restoration. The live captures above show both.</td></tr><tr><th scope="row">Google Gemini</th><td><span class="status-chip status-beta"><span aria-hidden="true"></span>Beta Â· experimental</span></td><td>Outgoing protobuf interception is implemented. Incoming restoration has reported buffering pauses; a restoration patch is planned.</td></tr><tr><th scope="row">Claude</th><td><span class="status-chip status-alpha"><span aria-hidden="true"></span>Alpha Â· experimental</span></td><td>Not currently supported. WSS/WebSocket interception is planned for V2.</td></tr></tbody></table></div></section>
-    <section class="wrap privacy-details"><div><p class="eyebrow">DESIGNED AROUND YOUR CONTROL</p><h2>Privacy, by design.</h2></div><div class="faq-list"><details id="healthcare-scope"><summary>How does the hospital example relate to HIPAA?<span aria-hidden="true">+</span></summary><p>It demonstrates masking four identifier types in a fictional medical-history prompt. The medical context remains in the outgoing request. Cloak does not establish HIPAA compliance or guarantee removal of all protected health information. Healthcare deployment requires an organizationâ€™s privacy and security review. <a href="https://www.hhs.gov/hipaa/for-professionals/special-topics/de-identification/index.html">Read HHS de-identification guidance â†—</a></p></details><details><summary>What stays on my device?<span aria-hidden="true">+</span></summary><p>Detection and token mappings stay local. The extensionâ€™s searchable vault supports individual reveal, export, and clear. Cloak has no server or telemetry; your AI service receives the masked request. The vault uses browser-local storage and is not encrypted by Cloak.</p></details><details><summary>What does Cloak cover?<span aria-hidden="true">+</span></summary><p>ChatGPT text chat requests on Chrome 111+. Gemini and Claude are experimental and are not supported in this release. Detected image/video generation requests bypass masking and trigger a notice. Pattern detection can miss details; review sensitive prompts. Tokens are placeholders, not encryption.</p></details><details><summary>What am I testing on this page?<span aria-hidden="true">+</span></summary><p>The expandable demos use the actual masking, restoration, stream-handling, and request-classification functions in a separate preview build. They process samples locally without starting an AI conversation or accessing extension data. The screenshot gallery documents a separate real ChatGPT conversation.</p></details><details><summary>Whatâ€™s next for Cloak?<span aria-hidden="true">+</span></summary><p>The roadmap includes a permission system where AI can request a specific detail only when neededâ€”for example, to schedule a meetingâ€”and the user decides whether to share it. This is planned functionality.</p></details></div></section>
+<section id="compatibility" class="wrap compatibility-section"><p class="eyebrow">PLATFORM SUPPORT</p><h2>Platform Compatibility &amp; Current Status</h2><p>ChatGPT is the only supported platform in this release.</p><div class="compatibility-table"><table><caption>Compatibility Matrix</caption><thead><tr><th scope="col">Platform</th><th scope="col">Status</th><th scope="col">Current implementation</th></tr></thead><tbody><tr><th scope="row">ChatGPT</th><td><span class="status-chip status-supported"><span aria-hidden="true"></span>Stable · supported</span></td><td>Outgoing interception and incoming stream restoration. The live captures above show both.</td></tr><tr><th scope="row">Google Gemini</th><td><span class="status-chip status-beta"><span aria-hidden="true"></span>Beta · experimental</span></td><td>Outgoing protobuf interception is implemented. Incoming restoration has reported buffering pauses; a restoration patch is planned.</td></tr><tr><th scope="row">Claude</th><td><span class="status-chip status-alpha"><span aria-hidden="true"></span>Alpha · experimental</span></td><td>Not currently supported. WSS/WebSocket interception is planned for V2.</td></tr></tbody></table></div></section>
+    <section class="wrap privacy-details"><div><p class="eyebrow">DESIGNED AROUND YOUR CONTROL</p><h2>Privacy, by design.</h2></div><div class="faq-list"><details id="healthcare-scope"><summary>How does the hospital example relate to HIPAA?<span aria-hidden="true">+</span></summary><p>It demonstrates masking four identifier types in a fictional medical-history prompt. The medical context remains in the outgoing request. Cloak does not establish HIPAA compliance or guarantee removal of all protected health information. Healthcare deployment requires an organization’s privacy and security review. <a href="https://www.hhs.gov/hipaa/for-professionals/special-topics/de-identification/index.html">Read HHS de-identification guidance ↗</a></p></details><details><summary>What stays on my device?<span aria-hidden="true">+</span></summary><p>Detection and token mappings stay local. The extension’s searchable vault supports individual reveal, export, and clear. Cloak has no server or telemetry; your AI service receives the masked request. The vault uses browser-local storage and is not encrypted by Cloak.</p></details><details><summary>What does Cloak cover?<span aria-hidden="true">+</span></summary><p>ChatGPT text chat requests on Chrome 111+. Gemini and Claude are experimental and are not supported in this release. Detected image/video generation requests bypass masking and trigger a notice. Pattern detection can miss details; review sensitive prompts. Tokens are placeholders, not encryption.</p></details><details><summary>What am I testing on this page?<span aria-hidden="true">+</span></summary><p>The expandable demos use the actual masking, restoration, stream-handling, and request-classification functions in a separate preview build. They process samples locally without starting an AI conversation or accessing extension data. The screenshot gallery documents a separate real ChatGPT conversation.</p></details><details><summary>What’s next for Cloak?<span aria-hidden="true">+</span></summary><p>The roadmap includes a permission system where AI can request a specific detail only when needed—for example, to schedule a meeting—and the user decides whether to share it. This is planned functionality.</p></details></div></section>
 
-    <section id="install" class="install-section wrap"><div class="install-top"><p class="eyebrow"><span class="status-dot"></span> BUILT IN DISTRICT FOUR. BUILT FOR WHATâ€™S NEXT.</p><h2>Move AI forward.<br><em>Keep privacy with it.</em></h2><div class="hero-actions"><a class="button primary" href="downloads/cloak-extension.zip" download>Download Cloak <span aria-hidden="true">â†“</span></a><a class="button secondary" href="https://github.com/L-Logix/cloak" target="_blank" rel="noopener">View source on GitHub <span aria-hidden="true">â†—</span></a></div><p class="install-caption">Chrome 111+ Â· Ready-to-load extension Â· ZIP includes source, tests, license, and notices Â· No account required</p></div><ol class="install-steps"><li><span>01</span><div><h3>Download and extract.</h3><p>Download the ZIP and extract it. Keep the complete folder because <code>manifest.json</code>, scripts, styles, icons, and license files must remain together.</p></div></li><li><span>02</span><div><h3>Load in Chrome.</h3><p>Open <code>chrome://extensions</code>, enable <strong>Developer mode</strong>, choose <strong>Load unpacked</strong>, and select the extracted folder containing <code>manifest.json</code>.</p></div></li><li><span>03</span><div><h3>Open ChatGPT.</h3><p>Refresh <code>chatgpt.com</code>, open Cloak, confirm protection is on, and select which identifier categories to mask.</p></div></li></ol></section>
+    <section id="install" class="install-section wrap"><div class="install-top"><p class="eyebrow"><span class="status-dot"></span> BUILT IN DISTRICT FOUR. BUILT FOR WHAT’S NEXT.</p><h2>Move AI forward.<br><em>Keep privacy with it.</em></h2><div class="hero-actions"><a class="button primary" href="downloads/cloak-extension.zip" download>Download Cloak <span aria-hidden="true">↓</span></a><a class="button secondary" href="https://github.com/L-Logix/cloak" target="_blank" rel="noopener">View source on GitHub <span aria-hidden="true">↗</span></a></div><p class="install-caption">Chrome 111+ · Ready-to-load extension · ZIP includes source, tests, license, and notices · No account required</p></div><ol class="install-steps"><li><span>01</span><div><h3>Download and extract.</h3><p>Download the ZIP and extract it. Keep the complete folder because <code>manifest.json</code>, scripts, styles, icons, and license files must remain together.</p></div></li><li><span>02</span><div><h3>Load in Chrome.</h3><p>Open <code>chrome://extensions</code>, enable <strong>Developer mode</strong>, choose <strong>Load unpacked</strong>, and select the extracted folder containing <code>manifest.json</code>.</p></div></li><li><span>03</span><div><h3>Open ChatGPT.</h3><p>Refresh <code>chatgpt.com</code>, open Cloak, confirm protection is on, and select which identifier categories to mask.</p></div></li></ol></section>
   </main>
-  <footer class="wrap footer"><div><a class="brand" href="#main"><img src="assets/mark.svg" width="25" height="28" alt="">CLOAK</a><p>Privacy and progress, in the same conversation.</p></div><div><span>CONGRESSIONAL APP CHALLENGE Â· NCâ€“04</span><p>Project showcase Â· Not an official congressional website.</p><a href="https://github.com/L-Logix/cloak">Source code â†—</a><a href="https://github.com/L-Logix/cloak/blob/unreleased/LICENSE">GPL-3.0 â†—</a><a href="https://www.congressionalappchallenge.us/wp-content/uploads/2026/05/2026-CAC-Rules.pdf">CAC judging criteria â†—</a></div></footer>
+  <footer class="wrap footer"><div><a class="brand" href="#main"><img src="assets/mark.svg" width="25" height="28" alt="">CLOAK</a><p>Privacy and progress, in the same conversation.</p></div><div><span>CONGRESSIONAL APP CHALLENGE · NC–04</span><p>Project showcase · Not an official congressional website.</p><a href="https://github.com/L-Logix/cloak">Source code ↗</a><a href="https://github.com/L-Logix/cloak/blob/unreleased/LICENSE">GPL-3.0 ↗</a><a href="https://www.congressionalappchallenge.us/wp-content/uploads/2026/05/2026-CAC-Rules.pdf">CAC judging criteria ↗</a></div></footer>
+
+  <script>
+    // Cloak cookies consent modal
+    (function () {
+      var panel = document.getElementById('cloak-cookies-consent-panel');
+      if (!panel) return;
+      var KEY = 'cloak_cookies_preference';
+
+      function applyConsent(granted) {
+        if (typeof gtag === 'function') {
+          gtag('consent', 'update', { analytics_storage: granted ? 'granted' : 'denied' });
+        }
+      }
+      function openModal() {
+        panel.classList.add('open');
+        var btn = panel.querySelector('.card-accept');
+        if (btn) btn.focus();
+      }
+      function closeModal() {
+        panel.classList.remove('open');
+      }
+      function decide(granted) {
+        try { localStorage.setItem(KEY, granted ? 'grant' : 'reject'); } catch (e) {}
+        applyConsent(granted);
+        closeModal();
+      }
+
+      // Accept / reject buttons
+      panel.querySelector('.card-accept').addEventListener('click', function () { decide(true); });
+      panel.querySelector('.card-reject').addEventListener('click', function () { decide(false); });
+
+      // Clicking the blurred backdrop closes without storing a choice
+      panel.addEventListener('click', function (e) {
+        if (e.target === panel) closeModal();
+      });
+      // Escape closes without storing a choice
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeModal();
+      });
+
+      // First visit: show the modal. Returning visit: apply the stored choice silently.
+      var stored = null;
+      try { stored = localStorage.getItem(KEY); } catch (e) {}
+      if (stored === 'grant') applyConsent(true);
+      else if (stored === 'reject') applyConsent(false);
+      else openModal();
+    })();
+  </script>
 </body>
 </html>
