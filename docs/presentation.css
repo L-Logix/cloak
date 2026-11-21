@@ -38,8 +38,10 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline-color: #8
   margin: 0;
   position: relative;
   z-index: 1;
+  cursor: pointer;
 }
 .hero-video-frame {
+  position: relative;
   aspect-ratio: 16 / 9;
   overflow: hidden;
   border: 1px solid #3b6047;
@@ -47,12 +49,43 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline-color: #8
   background: #050806;
   box-shadow: 0 22px 55px #0007, 0 0 35px #4ade800c;
 }
+.hero-video-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+}
+.video-play-badge {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 4px;
+  font-size: 18px;
+  color: #fff;
+  background: #080c0bcc;
+  border: 1px solid #86efac;
+  box-shadow: 0 10px 30px #000a;
+  transition: transform .2s ease, background .2s ease;
+}
+.hero-video-card:hover .video-play-badge,
+.hero-video-card:focus-visible .video-play-badge {
+  background: #15803dee;
+  transform: scale(1.06);
+}
 .hero-video-frame iframe {
+  display: block;
   width: 100%;
   height: 100%;
   border: 0;
-  display: block;
 }
+.hero-video-panel figcaption,
 .hero-video-card figcaption {
   display: flex;
   justify-content: space-between;
@@ -62,6 +95,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline-color: #8
   font-size: 9px;
   line-height: 1.5;
 }
+.hero-video-panel figcaption a,
 .hero-video-card figcaption a { color: #86efac; white-space: nowrap; }
 
 .status-chip {
@@ -103,5 +137,6 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline-color: #8
 
 @media (max-width: 850px) {
   .hero-video-panel { margin-top: 8px; }
+  .hero-video-panel figcaption,
   .hero-video-card figcaption { flex-direction: column; }
 }

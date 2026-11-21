@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <!--
   Copyright (C) 2026 L-Logix
   Licensed under the GNU General Public License v3.0 only.
@@ -17,6 +17,14 @@
   <meta name="twitter:card" content="summary_large_image">
   <title>Cloak — Your ideas. Not your identity.</title>
   <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    // GDPR default: no analytics storage until the visitor accepts in the consent modal
+    gtag('consent', 'default', { analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
+  </script>
+  <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-NRP53CQN"></script>
   <link rel="stylesheet" href="site.css">
   <link rel="stylesheet" href="dark.css">
   <script src="assets/preview-engine.js" defer></script>
@@ -29,6 +37,120 @@
   <script src="motion.js" defer></script>
   <link rel="stylesheet" href="presentation.css">
 </head>
+<body>
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NRP53CQN"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+  <!-- Cloak cookies consent modal -->
+  <style>
+    /* Consent: centered modal over a blurred page backdrop */
+    .cloak-cookies-consent-panel {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(4, 7, 6, 0.55);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+      font-family: var(--font, 'Segoe UI', system-ui, -apple-system, sans-serif);
+    }
+    .cloak-cookies-consent-panel.open { display: flex; }
+    .cloak-cookies-consent-panel .consent-card {
+      width: min(420px, 100%);
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+      background: #080c0b;
+      border: 1px solid #24372c;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 24px 60px #000c, 0 0 30px #15803d14;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      animation: consentPop .28s ease-out;
+    }
+    @keyframes consentPop {
+      from { opacity: 0; transform: translateY(14px) scale(.97); }
+      to { opacity: 1; transform: none; }
+    }
+    .cloak-cookies-consent-panel .card-header {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+    .cloak-cookies-consent-panel .eyebrow {
+      font-size: 10px;
+      line-height: 1.5;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #6ee7a0;
+      margin: 0;
+    }
+    .cloak-cookies-consent-panel h3 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -.02em;
+      color: #ffffff;
+      margin: 0;
+    }
+    .cloak-cookies-consent-panel p {
+      font-size: 13px;
+      line-height: 1.6;
+      color: #a8b8ae;
+      margin: 0;
+    }
+    .cloak-cookies-consent-panel .card-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .cloak-cookies-consent-panel .card-actions .button {
+      flex: 1;
+      justify-content: center;
+      font-size: 13px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      border: 1px solid #3f4753;
+      background: #101317;
+      color: #e7ebf0;
+    }
+    .cloak-cookies-consent-panel .card-accept {
+      background: #15803d;
+      border-color: #15803d;
+      color: #fff;
+    }
+    .cloak-cookies-consent-panel .card-accept:hover {
+      background: #16a34a;
+      border-color: #16a34a;
+    }
+    .cloak-cookies-consent-panel .card-reject:hover {
+      background: #28323c;
+    }
+    @media (max-width: 420px) {
+      .cloak-cookies-consent-panel .card-actions { flex-direction: column; }
+    }
+  </style>
+
+  <div id="cloak-cookies-consent-panel" class="cloak-cookies-consent-panel" role="dialog" aria-modal="true" aria-label="Cloak cookies consent">
+    <div class="consent-card">
+      <div class="card-header">
+        <span class="eyebrow">Cookies consent</span>
+        <h3>Cloak cookies consent</h3>
+      </div>
+      <p>We use Google Analytics to understand how the Cloak website is used. This helps us improve the extension and documentation.</p>
+      <p>Google Analytics collects anonymous information about your visit, including pages viewed and time spent on the site. No personal identifying information is collected.</p>
+      <div class="card-actions">
+        <button type="button" class="button card-accept">Accept analytics</button>
+        <button type="button" class="button card-reject">Reject analytics</button>
+      </div>
+    </div>
+  </div>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="header wrap">
